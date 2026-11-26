@@ -48,7 +48,7 @@ fi
 if [ "$MAJOR_ISSUES_COUNT" -gt 0 ]; then
   cat > "$P_DA" <<EOF
 아래 리뷰 이슈 목록에 대해 Devil's Advocate 분석을 수행하라.
-각 이슈에 agree|challenge|supplement|reverse 판정과 근거를 제시하라. 파일을 수정하지 마라(읽기 전용 분석).
+각 이슈에 agree|challenge|supplement|reverse|abstain 판정과 근거를 제시하라(abstain = 보이는 근거로 맞다 · 틀리다를 가를 수 없음 — 가를 측정을 적는다). 파일을 수정하지 마라(읽기 전용 분석).
 ## 이슈 목록
 $MAJOR_ISSUES
 EOF
@@ -134,7 +134,7 @@ fz-peer-review(기본 실행)와 fz-review(`--gpt-independent` · 기본 off)가
 1. **Workflow 직전에** 런처를 `run_in_background` 로 띄운다 — 두 패스가 동시에 돈다. GPT 는 허용 입력만 받아 Claude 산출을 보지 않는다
 2. 입력을 나눠 준다 — 규칙 레코드(`projectRulesPath`)는 Workflow args 에만, 지침 원문 색인은 런처 `--rules-index` 에만 준다(같은 파일이 아니다 — 위 bullet). fz-review 는 Workflow args 에 `locatedFindings: true` 를 함께 준다 — 위치 필드(`line_range`)가 없는 Claude 발견은 병합에서 GPT 의 같은 지적과 묶이지 않는다
 3. ⛔ GPT 팔이 끝나기 전에는 대상 트리를 고치지 않는다 — 감사(`.audit.json` 의 `inputs`)가 GPT 가 본 diff 의 sha256 을 남기고, 병합이 `--diff` 와 대조해 다르면 stale 로 거부한다
-4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {런처 --diff 와 같은 파일}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로, 18(GPT 미사용)이면 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다(사유 = `GPT-OFF:` 줄 · `modules/gpt-strategy.md` § GPT 미사용). Tier 1(Workflow 없음)은 Lead 발견을 `{"issues": [{id, severity, file, line_range, discoveryAxis, title, evidence}]}` 로 `{WORK_DIR}/review/lead-findings.json` 에 써서 `--claude` 로 준다 — evidence 는 diff 원문을 백틱으로 인용한다(병합이 그 hunk 에서 다시 찾는다 · 계약은 `review_merge.py` 머리말 입력 계약)
+4. 두 패스가 끝나면 병합한다: `python3 "${FZ_PLUGIN_ROOT}/scripts/review_merge.py" --claude {Workflow 반환 JSON} --gpt {out-dir}/gpt-{run}.json --diff {런처 --diff 와 같은 파일}`. 옆 파일(`.contaminated` · `.audit.json`)이 오염 · 실패 · stale 을 말하면 exit 1(거부)이다. 런처가 10~17 로 끝났으면 `--gpt` 대신 `--gpt-unavailable "exit {n} — {note}"` 로, 18(GPT 미사용)이면 `--gpt-unavailable "GPT 미사용 — <사유>"` 로 부른다(사유 = `GPT-OFF:` 줄 · `modules/gpt-strategy.md` § GPT 미사용). Tier 1(Workflow 없음)은 Lead 발견을 `{"issues": [{id, severity, file, line_range, discoveryAxis, title, evidence}], "observations": [{id, file, line_range, what, reason}]}` 로 `{WORK_DIR}/review/lead-findings.json` 에 써서 `--claude` 로 준다(`observations` = 기존 스레드를 읽기 전에 Lead 가 기각한 관찰 — 병합본에 exclude 후보로 남는다 · F-643) — evidence 는 diff 원문을 백틱으로 인용한다(병합이 그 hunk 에서 다시 찾는다 · 계약은 `review_merge.py` 머리말 입력 계약)
 5. 병합 결과가 기존 GPT 리뷰 호출(fz-review Phase 5 [병렬 2] · fz-peer-review GPT challenger)을 대신한다 — 두 번 부르지 않는다. Tier 3 GPT DA 는 병합 뒤 한 번이다
 - 경로는 **플러그인 루트 기준**이다 — `FZ_PLUGIN_ROOT` 는 `scripts/resolve-plugin-root.sh` 로 푼다(상대 경로는 대상 레포에서 조용히 빗나간다)
 

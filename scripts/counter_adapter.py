@@ -34,7 +34,7 @@ import sys
 import tempfile
 
 ANNOTATIONS = ("finalSeverity", "crossVerdict", "crossNote", "counterVerdict", "counterNote")
-VERDICT = {"agree": "uphold", "supplement": "uphold", "challenge": "refute", "reverse": "refute"}
+VERDICT = {"agree": "uphold", "supplement": "uphold", "challenge": "refute", "reverse": "refute", "abstain": "unchallenged"}   # abstain = 판정 보류(F-153)
 SEVERITIES = ("critical", "major", "minor", "suggestion")
 GPT_OFF = 18   # scripts/gpt-call.sh — GPT 미사용은 실패가 아니지만 이 arm 에는 DA 가 없었다
 
@@ -95,6 +95,8 @@ def convert(gpt, gpt_exit):
     for c in chs:
         if not isinstance(c, dict) or not c.get("target_issue_id") or c.get("action") not in VERDICT:
             return invalid(f"schema — challenge 모양 위반: {json.dumps(c, ensure_ascii=False)[:80]}")
+        if VERDICT[c["action"]] == "unchallenged":
+            continue                               # abstain = 반론 없음 — 행을 만들지 않는다(CounterSchema 는 uphold · refute 뿐 · okArea 반례로 섞이지 않게)
         challenges.append({"target": c["target_issue_id"], "verdict": VERDICT[c["action"]],
                            "note": str(c.get("reason") or ""), "gptAction": c["action"]})
     missed = []
@@ -237,6 +239,10 @@ def self_test():
          and byid["A:A1"]["counterVerdict"] == "refute" and byid["A:A1"]["counterNote"] == "라인 오독"
          and byid["Q:Q1"]["counterVerdict"] == "uphold" and byid["C:GPT-001"]["crossVerdict"] == "counter_found", json.dumps(list(byid)))
     case("okarea-challenge", merged["okAreaChallenges"] == [{"target": "캐시 무효화 OK", "verdict": "refute", "note": "반례 있음"}], json.dumps(merged["okAreaChallenges"], ensure_ascii=False))
+    ab = convert({"schemaVersion": "1.1", "issues": [],
+                  "challenges": [{"target_issue_id": "캐시 무효화 OK", "action": "abstain", "reason": "근거 부족"}]}, 0)
+    case("f153-abstain-no-challenge-row — abstain 은 반론 행을 만들지 않는다(okArea 반례 · CounterSchema 밖 값으로 새지 않음)",
+         ab.get("armValid") is True and (ab.get("counter") or {}).get("challenges") == [], json.dumps(ab, ensure_ascii=False)[:200])
     d = merged["distribution"]
     case("distribution-recount", (d["major"], d["minor"], d["fpFlagged"], d["structuralAxes"]) == (2, 1, 1, False), json.dumps(d))
 

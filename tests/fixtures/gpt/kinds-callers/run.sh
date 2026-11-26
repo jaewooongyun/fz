@@ -189,7 +189,7 @@ case("challenger-roundtrip", not problems, "; ".join(problems))
 SHIM = os.path.join(ROOT, "tests", "fixtures", "gpt", "_shim")
 SAMPLE = os.path.join(ROOT, "tests", "fixtures", "gpt", "independent-arm", "sample-review-ok.json")
 TIER_SLOTS = {0: ["requirements", "old-new-pairs", "base-behavior"], 1: ["requirements", "old-new-pairs", "base-behavior", "base-patterns"]}
-TIER_SLOTS[2] = TIER_SLOTS[1] + ["producer-consumer", "convention-samples"]
+TIER_SLOTS[2] = TIER_SLOTS[1] + ["producer-consumer", "convention-samples", "open-observations"]   # F-105
 TIER_SLOTS[3] = TIER_SLOTS[2] + ["caller-analysis", "semantic-mapping", "deletion-verification"]
 TOOLS = "[Serena 미사용 — fixture] · context7 목록✓ · sc 목록✓ · seq 목록✓ · pr-review 목록✓ · 스택 스킬 없음\n"
 DA = "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-a\n+b\n"

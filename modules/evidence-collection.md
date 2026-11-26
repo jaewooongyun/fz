@@ -31,7 +31,8 @@ ${WORK_DIR}/evidence/
 ├── deletion-verification.md — 삭제 심볼의 잔존 참조 확인
 ├── base-patterns.md         — regression 판정용 base 코드 패턴
 ├── caller-analysis.md       — 신규/변경 init의 호출자 코드 + 참조 타입
-└── convention-samples.md    — 프로젝트 내 동일 패턴 샘플 (convention 판정)
+├── convention-samples.md    — 프로젝트 내 동일 패턴 샘플 (convention 판정)
+└── open-observations.md     — Lead 미판정 관찰 (인용 + 관측만 · §g)
 ```
 
 ## 수집 절차
@@ -191,6 +192,16 @@ PR의 핵심 패턴과 **같은 패턴의 다른 모듈** 코드를 수집한다
 
 | Pattern | PR Code | Module A | Module B | Module C | Convention? |
 |---------|---------|----------|----------|----------|------------|
+
+### g. Lead 미판정 관찰 → `evidence/open-observations.md`
+
+> 관측 사례(F-105): Lead 가 Gather 중 `suspend()` 는 `pauseAd()` + `pause()` 둘 다, `resume()` 은 `resumeAd()` 만 부르는 비대칭을 직접 보고 "확인 필요" 로 자기 TODO 에 두었다. evidence 어디에도 적지 않아 렌즈 3개와 GPT challenger 가 모두 그 지점을 보고하지 않았다 — 관측 사실은 InputHygiene 이 허용하는데 수집 절차가 시키지 않았다.
+
+Gather 중 Lead 가 눈으로 본 이상 신호 가운데 그 자리에서 판정하지 못한 것을 적는다.
+
+- ⛔ 형식은 **인용 + 관측**까지만이다 — `파일:줄` 과 코드, 그리고 본 사실. "~인 것 같다" · "문제로 보인다" 는 쓰지 않는다(§ InputHygiene 그대로).
+- 판정 요청 문장을 붙이지 않는다 — 렌즈가 스스로 보게 두고, 렌즈가 보지 않으면 Lead 가 직접 판정한다.
+- 어느 Tier 에서 요구하는지와 skip 표기는 `modules/peer-review-tiers.md` § Tier-Adaptive Evidence 의 `open-observations` 행이 정한다.
 
 ---
 

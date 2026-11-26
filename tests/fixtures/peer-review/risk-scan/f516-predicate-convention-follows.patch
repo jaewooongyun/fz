@@ -1,0 +1,13 @@
+diff --git a/src/Link.swift b/src/Link.swift
+index 1111111..2222222 100644
+--- a/src/Link.swift
++++ b/src/Link.swift
+@@ -3,5 +3,9 @@ final class LinkRouter {
+         guard url.scheme == "https" else { return }
+         open(url)
+     }
++    func openPromotion(_ url: URL) {
++        guard url.scheme == "https" else { return }
++        open(url)
++    }
+ }

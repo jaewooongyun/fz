@@ -265,9 +265,10 @@
               "agree",
               "challenge",
               "supplement",
-              "reverse"
+              "reverse",
+              "abstain"
             ],
-            "description": "판정: agree(동의), challenge(반박-confidence 20% 감소), supplement(보완), reverse(역전 — 원래 이슈를 지우지 않는다: 병합 계약에 따라 question 으로 전환되니 판별 근거를 reason 에 적는다)"
+            "description": "판정: agree(동의), challenge(반박-confidence 20% 감소), supplement(보완), reverse(역전 — 원래 이슈를 지우지 않는다: 병합 계약에 따라 question 으로 전환되니 판별 근거를 reason 에 적는다), abstain(판정 보류 — 근거가 모자라 동의도 반박도 못 한다: question 으로 전환되니 무엇을 재면 갈리는지 reason 에 적는다 · F-153)"
           },
           "reason": {
             "type": "string",

@@ -68,6 +68,7 @@ fz-peer-review는 티켓 폴더와 별도 WORK_DIR을 사용:
 ├── review-index.md
 ├── synthesized-issues.json
 ├── merged.json                # review_merge.py 병합본 — Curate 후보 원본
+├── merged-prethread.json      # 같은 diff 의 첫 병합본(스레드 읽기 전 고정 · '기존 스레드 대비 독립 발견' 표 근거 — F-643)
 ├── existing-threads.json      # gather 가 모은 기존 스레드(status ok · unavailable · not-a-pr)
 ├── target.json                # 리뷰 대상 {kind, ref, sha} — evidence · Serena 트리 @sha 대조 기준
 ├── review.json                # 판정 · 코멘트(issues) · 제외(excluded) — 렌더러 단일 출처

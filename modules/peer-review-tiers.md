@@ -336,6 +336,8 @@ Single-reviewer mode. Confidence Matrix 대신 simple checklist:
 
 Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Synthesize §2-§2.5 참조).
 
+Lead 발견 · 기각 관찰(`issues` · `observations`)을 `${WORK_DIR}/review/lead-findings.json` 에 쓰고 GPT 없이 병합한다 — `review_merge.py --claude … --gpt-unavailable "Tier 0 — GPT 없음" --out "${WORK_DIR}/merged.json"`. 기존 스레드를 읽기 전에 병합해야 첫 병합본(`merged-prethread.json`)이 독립 발견을 가른다 (F-643)
+
 ### Deliver
 - `${WORK_DIR}/review-report.md` 작성 (의무)
 - `${WORK_DIR}/pr-comments.md` 작성 (선택)
@@ -370,9 +372,10 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Lead 단독 분석 (Tier 0와 동일 — 상시 5 + 조건부 2 + 형제 대조 1)
 - + GPT challenger 1회 — 호출은 § GPT Analyze 호출 한 형태다(래퍼 exec · `gpt_peer_review_schema` · 산출 `${WORK_DIR}/gpt-challenger-result.json`)
 - ⛔ 래퍼 exit 10~14 는 전부 측정 실패다(스키마 계약 위반 14 포함 — "이슈 0건" 아님). 선택 관련 실패(래퍼 stderr 의 `CHOICE-UNREADABLE` · `CHOICE-SCRIPT-ERROR` 태그, 모델·effort 거부 12)는 먼저 `modules/gpt-strategy.md` § 모델·effort 선택의 처방을 따른다. 그 밖이거나 처방 뒤에도 실패면 `skills/fz-peer-review/SKILL.md` § 에러 대응의 Tier 1 GPT 실패 규칙(`solo (gpt 실패)` — 실질 Tier 0 강등)으로 간다 · ⛔ exit 18(`GPT-OFF` — 사용자 선택 · CLI 없음)은 실패가 아니다 — GPT 칸 `[GPT 미사용 — 사유]` · 병합 `--gpt-unavailable` · 강등 · 감쇠 없음(`modules/gpt-strategy.md` § GPT 미사용)
-- ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh peer-independent-review --evidence-root "${WORK_DIR}" --tier 1` 을 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견을 `{"issues": […]}` 로 써서 `review_merge.py --claude … --out "${WORK_DIR}/merged.json"` 로 합친다(병합본 고정 경로 — Curate 후보 원본 · 모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)
+- ⊕ 기본으로(`--no-gpt-independent` 면 위 challenger) 위 challenger 대신 `"${FZ_PLUGIN_ROOT}"/scripts/gpt-call.sh peer-independent-review --evidence-root "${WORK_DIR}" --tier 1` 을 쓴다 — 허용 입력만 격리 폴더로 들어가 Lead 요약 · 가설이 GPT 에 닿지 않는다. Synthesize 에서 Lead 발견 · 기각 관찰을 `{"issues": […], "observations": […]}` 로 써서 `review_merge.py --claude … --out "${WORK_DIR}/merged.json"` 로 합친다(병합본 고정 경로 — Curate 후보 원본 · 모양 · 순서 정본 `modules/fz-gpt-subcommands-aux.md` § review — Lead 순서 4)
 - GPT prompt는 압축 형태 (~5K input). evidence를 *인라인 embed* (자율 read 방지)
 - ⛔ **실행 필요 표면 — launch smoke** (F-366: 루트 화면을 바꾼 PR 의 검은 화면을 정적 리뷰만으로 놓쳤다): `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --risk "${WORK_DIR}/risk.json" --rule "${WORK_DIR}/rules/rules.json" --repo {리뷰 대상 head 를 체크아웃한 트리} --expect-head {PR headRefOid · 브랜치면 그 팁} --out "${WORK_DIR}/launch-smoke.md"` — `risk.json` 의 `launch_surface.flag` 가 false 면 '대상 아님' 만 쓴다. 실행 방법(`launchSmoke` 레코드 — `modules/project-rules.md` §3)이 없거나 HEAD 가 다르면 실행하지 않고 '⛔ 실행 미검증' 배너다. 첫 줄이 리포트에 들어갈 요약 줄이다 — 기본(렌더) 경로면 `review.json` 의 `launchSmoke` 에 그 줄을 넣는다(`scripts/render_review.py` 가 리포트 · payload body 에 같이 싣는다)
+- ⛔ **PR 테스트 실행** (F-580: PR 이 더한 테스트 17건 중 1건이 결정적으로 실패했는데 정적 렌즈 · GPT 독립 패스(격리 샌드박스라 실행 불가) · Curate 가 모두 통과시켰다): `risk.json` 의 `pr_tests`(diff 가 더하거나 고친 테스트 파일 · 스위트)가 비지 않으면 리뷰 대상 head 트리에서 그 스위트만 돌린다 — 패키지 스킴 `-only-testing` 부터(앱 타깃 테스트는 앱 전체 빌드라 비용 축이 다르다). 결과 한 줄(통과 · 실패 건수와 실패 이름 · 미실행 사유 — 어떤 스킴에서도 돌지 않는 테스트 포함)을 `review.json` 의 `testRun` 에 넣는다. 실패는 bug 카드 `repro.status = reproduced` 의 근거다. 돌리지 않으면 `evidence/skipped.md` 에 `- test-run: <사유>`. ⚠️ 렌더러는 아직 `testRun` 을 리포트에 싣지 않는다(launchSmoke 와 달리 미배선)
 
 ### Synthesize
 ⛔ **Coverage Gate**·**Negative-Result Gate** 는 경량 경로에서도 **생략 불가**(검증 경계). GPT 호출이 있으므로 **Reflection Rate** 도 산출 — ⛔ `N<10` 은 preliminary, verdict 없음. 목록: `modules/peer-review-gates.md` § 경량 경로.
@@ -383,12 +386,13 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 - Lead + GPT 결과 dedup — 키는 § 3 (`파일` + `line_range` 겹침 + `discoveryAxis`)
 - 2-vote Confidence Matrix (3-vote 대비 단순화) — § 9 Tier 1 행
 - GPT verdict 처리는 § 6 — ⛔ `reverse` 는 제거가 아니라 `question` 전환
-- GPT 결과 소비: Tier 1 결과(`gpt-challenger-result.json`)는 Lead 가 Synthesize 에서 `modules/peer-review-gates.md` § MergeContract § 6 을 적용한다 — `challenges[].action`(agree · challenge · supplement · reverse)이 § 6 verdict 어휘다(`issues[]` 는 위 § 3 dedup · § 9 투표). 이 결과는 `--no-gpt-independent` 로 challenger 를 고른 경로의 것이다 — 기본 경로(독립 첫 패스)는 `scripts/review_merge.py` 가 합친다
+- GPT 결과 소비: Tier 1 결과(`gpt-challenger-result.json`)는 Lead 가 Synthesize 에서 `modules/peer-review-gates.md` § MergeContract § 6 을 적용한다 — `challenges[].action`(agree · challenge · supplement · reverse · abstain)이 § 6 verdict 어휘다(`issues[]` 는 위 § 3 dedup · § 9 투표). 이 결과는 `--no-gpt-independent` 로 challenger 를 고른 경로의 것이다 — 기본 경로(독립 첫 패스)는 `scripts/review_merge.py` 가 합친다
 - Independence: GPT sandbox 독립 = HIGH
 
 ### Deliver
 - review-report.md + pr-comments.md
 - ⛔ `python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"` — exit 1 이면 `launch-smoke.md` 첫 줄을 `review.json` 의 `launchSmoke` 에 넣고 렌더를 다시 돌린다(⛔ 렌더된 리포트를 손으로 고치지 않는다 — payload body 와 어긋난다 · `--render` 를 끈 경로만 리포트에 직접 쓴다). '대상 아님' 은 검사하지 않는다. 미실행을 적기만 하고 게이트로 쓰지 않은 것이 F-366 이다
+- ⛔ `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --test-run --tier {Tier}` — exit 1 이면 `pr_tests` 를 돌린 기록이 없다(`review.json` `testRun` 또는 skipped `- test-run: <사유>` · F-580) · 2 는 판정 불가(risk.json 없음 · `pr_tests` 키 없음 — ⛔ 통과 아님 · gather 재수집). 기본 슬롯 검사(Gather 5.5)는 이것을 보지 않는다 — 그때는 review.json 이 없다
 - **축별 집계** — Tier 0 Deliver 와 같다(렌더 경로면 렌더러가 그린다)
 
 ---
@@ -450,7 +454,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 
 > ⛔ **canonical set** — 수집 항목의 정본 목록이다. 행 수가 아니라 **ID 집합**으로 대조한다. 행만 세면 빠진 항목 대신 중복이 들어가도 통과한다.
 
-**evidence 9종**
+**evidence 10종**
 
 | ID | Tier 0 | Tier 1 | Tier 2 | Tier 3 | 조건부 발화 |
 |---|:---:|:---:|:---:|:---:|---|
@@ -463,6 +467,7 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 | `caller-analysis` | ⊕ | ⊕ | ⊕ | ✓ | init·DI·초기화 경로 · class init · willSet/didSet 변경 |
 | `semantic-mapping` | ⊕ | ⊕ | ⊕ | ✓ | 리팩토링·치환·마이그레이션 |
 | `deletion-verification` | ⊕ | ⊕ | ⊕ | ✓ | 심볼·함수 제거 |
+| `open-observations` | ⊕ | ⊕ | ✓ | ✓ | Lead 미판정 관찰 — Gather 중 눈으로 보고 그 자리에서 판정하지 못한 이상 신호를 **인용 + 관측**으로만 적는다(F-105 · 절차 `modules/evidence-collection.md` §g). Tier 2/3 은 렌즈 입력이라 없으면 skipped 에 `- open-observations: 미판정 관찰 없음` |
 
 `✓` 상시 · `⊕` 조건부 · `—` 미수집
 
@@ -502,9 +507,11 @@ Origin 보정(R/P/I), PR Intent Alignment Check는 그대로 적용 (SKILL.md Sy
 3. Lead: GPT challenger ×1 — § GPT Analyze 호출  (out-of-band — ⛔ 스크립트 내 cross-provider 스폰 금지)
 3.5 Lead: launch smoke (F-366 · Workflow 와 병렬 가능 · 인자는 Tier 1 Analyze 와 같다)
      python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --risk "${WORK_DIR}/risk.json" --rule "${WORK_DIR}/rules/rules.json" --repo {head 트리} --expect-head {headRefOid} --out "${WORK_DIR}/launch-smoke.md"
+3.6 Lead: PR 테스트 실행 (F-580 · Workflow 와 병렬 가능 · 방법은 Tier 1 Analyze 와 같다) — risk.json pr_tests 가 비지 않으면 그 스위트만 · 결과 한 줄을 review.json testRun
 4. 반환 { mode:'workflow', tier:2, reviews, issues, metrics } → Lead 단순 병합 (Matrix 미투표)
 4.5 Lead: 심볼 도구 점검 — python3 "${FZ_PLUGIN_ROOT}/scripts/fz_wf_metrics.py" --mcp-audit --wf {runId 폴더명} --tools-md "${WORK_DIR}/evidence/tools.md"   // exit 1 · 2 는 통과 아님 · 낱말마다 할 일 modules/symbol-tools-audit.md
 5. Lead: Deliver 전 — python3 "${FZ_PLUGIN_ROOT}/skills/fz-peer-review/scripts/launch_smoke.py" --check-report "${WORK_DIR}/review-report.md" --smoke "${WORK_DIR}/launch-smoke.md"   // exit 1 이면 요약 줄을 review.json launchSmoke 에 넣고 다시 렌더
+   + python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --test-run --tier {Tier}   // exit 1 이면 testRun 또는 skipped test-run · 2 는 판정 불가(통과 아님)
 ```
 
 ⛔ **Tier 2 반환 계약 — 트리거 발화 여부로 필드가 달라진다** (D1):
@@ -570,7 +577,7 @@ done
 cat > "${WORK_DIR}/gpt-challenger-prompt.txt" <<EOF
 아래 PR 변경을 검증하라. 파일을 수정하지 마라(읽기 전용 분석).
 - issues[]: evidence 로 독립 발견 — 각 이슈에 Origin Classification(regression/pre-existing/improvement). base class init/willSet 변경이면 subclass 를 찾는다(Inheritance Chain)
-- challenges[]: 아래 발견 목록의 각 id 에 agree|challenge|supplement|reverse 판정과 근거
+- challenges[]: 아래 발견 목록의 각 id 에 agree|challenge|supplement|reverse|abstain 판정과 근거(반박 못 했다고 agree 를 고르지 않는다)
 발견 목록(id 포함):
 $(cat "${WORK_DIR}/challenger-findings.md")
 Evidence(인라인 — 규칙 원문 색인 포함):

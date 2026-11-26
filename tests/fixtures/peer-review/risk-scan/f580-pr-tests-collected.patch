@@ -1,0 +1,48 @@
+diff --git a/Sources/Player/AdVideoLayer.swift b/Sources/Player/AdVideoLayer.swift
+index 1111111..2222222 100644
+--- a/Sources/Player/AdVideoLayer.swift
++++ b/Sources/Player/AdVideoLayer.swift
+@@ -1,3 +1,4 @@
+ final class AdVideoLayer {
++    var isReady = false
+ }
+diff --git a/Tests/MediaPlayerTests/AdVideoLayerTrackingTests.swift b/Tests/MediaPlayerTests/AdVideoLayerTrackingTests.swift
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/Tests/MediaPlayerTests/AdVideoLayerTrackingTests.swift
+@@ -0,0 +1,9 @@
++import XCTest
++final class AdVideoLayerTrackingTests: XCTestCase {
++    func testTopLayerBeforeFirstFrame() {
++        XCTAssertFalse(AdVideoLayer().isReady)
++    }
++}
++final class AdVideoLayerKVCTests: XCTestCase {
++    func testReadyForDisplay() {}
++}
+diff --git a/Tests/MediaPlayerTests/Mocks/MockLayer.swift b/Tests/MediaPlayerTests/Mocks/MockLayer.swift
+new file mode 100644
+index 0000000..4444444
+--- /dev/null
++++ b/Tests/MediaPlayerTests/Mocks/MockLayer.swift
+@@ -0,0 +1 @@
++final class MockLayer {}
+diff --git a/Tests/MediaPlayerTests/LegacyTests.swift b/Tests/MediaPlayerTests/LegacyTests.swift
+deleted file mode 100644
+index 5555555..0000000
+--- a/Tests/MediaPlayerTests/LegacyTests.swift
++++ /dev/null
+@@ -1,3 +0,0 @@
+-import XCTest
+-final class LegacyTests: XCTestCase {
+-}
+diff --git a/tests/test_api.py b/tests/test_api.py
+index 6666666..7777777 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -1,2 +1,4 @@
+ def test_ok():
+     assert True
++def test_scheme():
++    assert parse("https://x").scheme == "https"

@@ -637,4 +637,4 @@ echo "  diff.patch · requirements.md · base-behavior.md · base/ · head/ · b
 [ -f "$WORK_DIR/evidence-move-drift.md" ] && echo "  ⭐ evidence-move-drift.md — 이동 리팩토링 감지. 동등성과 **별개 축**이다"
 grep -q '⛔ \*\*head 커밋' "$WORK_DIR/review-surface.md" 2>/dev/null && \
   echo "⚠️  중복 커밋 감지 — review-surface.md 를 먼저 읽어라. Tier 판정이 부풀려져 있다"
-echo "⛔ Lead 가 채울 것: old-new-pairs · producer-consumer · caller-analysis · convention-samples · semantic-mapping (Tier 별 canonical set 참조)"
+echo "⛔ Lead 가 채울 것: old-new-pairs · producer-consumer · caller-analysis · convention-samples · semantic-mapping · open-observations(Tier 2/3) (Tier 별 canonical set 참조)"

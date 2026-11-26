@@ -5,7 +5,10 @@
 #    다음 사람이 같은 표를 다시 읽어야 하고, 기대값이 어디에도 고정되지 않는다.
 #
 # 비교 키: risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs ·
-#   convention_deviations — 셀의 expected 에 적힌 키만 본다. 셀 이름 폴더 `<셀>.head/` 가 있으면 `--head` 로 넘긴다(F-516 형제 대조).
+#   convention_deviations · pr_tests — 셀의 expected 에 적힌 키만 본다. 셀 이름 폴더 `<셀>.head/` 가 있으면 `--head` 로 넘긴다(F-516 형제 대조).
+#   셀의 `env`({이름: 값})는 그 셀의 risk_scan 실행에만 더한다(관점 축 프로젝트 토큰 env — F-083). 셀에 env 가 없으면 FZ_RISK_* 는 비운다.
+#   셀의 `convention_md_has`(문자열 목록)는 `--convention-md` 산출(렌즈가 읽는 evidence-convention.md)에 각 문자열이 있어야 한다(F-516).
+#   셀의 `detail_net`({카테고리: net_tokens})는 그 카테고리의 토큰별 순변화를 본다 — categories 만 보면 어느 갈래가 걸렸는지 모른다(F-083).
 #   removed_paths = 삭제 행이 1줄 이상 귀속된 경로(정렬). --json 출력에 없는 값이라 risk_scan.py 를 모듈로 읽어
 #   added_lines_by_file 의 removed 키를 본다(F-381 — 수정 전 트리는 삭제 파일을 '/dev/null' 한 키로 모았다).
 # usage: run.sh [--tree <플러그인 트리>]   그 트리의 risk_scan.py 를 이 폴더의 expected.json · patch 로 판정한다
@@ -32,7 +35,7 @@ command -v python3 >/dev/null 2>&1 || { echo "PREP  python3 부재"; exit 3; }
 [ -f "$EXPECTED" ] || { echo "PREP  expected.json 이 없다"; exit 3; }
 
 out="$(PYTHONDONTWRITEBYTECODE=1 python3 -B - "$SCAN" "$EXPECTED" "$HERE" 2>&1 <<'PY'
-import importlib.util, json, os, subprocess, sys, traceback
+import importlib.util, json, os, shutil, subprocess, sys, tempfile, traceback
 
 
 def _crash(*exc):   # 단언기 고장은 3 — 미처리 예외의 기본 exit 1 은 '불일치' 와 구별되지 않는다
@@ -46,7 +49,8 @@ sys.dont_write_bytecode = True
 scan, expected_path, here = sys.argv[1], sys.argv[2], sys.argv[3]
 cases = json.load(open(expected_path, encoding="utf-8"))["cases"]
 KEYS = ("risk", "added_lines", "tier_delta", "files", "removed_paths", "categories", "runtime_axes", "doc_contract_deleted",
-        "plugin_refs", "convention_deviations")
+        "plugin_refs", "convention_deviations", "pr_tests")
+BASE_ENV = {k: v for k, v in os.environ.items() if not k.startswith("FZ_RISK_")}   # 사용자 셸의 토큰 env 가 셀 판정을 바꾸지 않게
 
 
 class Prep(Exception):
@@ -64,14 +68,17 @@ def removed_paths(text):
 
 
 fail = 0
+tmp = tempfile.mkdtemp(prefix="risk-scan-md-")
 try:
     for name in sorted(cases):
         patch = os.path.join(here, name + ".patch")
         if not os.path.exists(patch):
             raise Prep("%s: fixture 파일 없음" % name)
         head = os.path.join(here, name + ".head")
-        r = subprocess.run([sys.executable, "-B", scan, patch, "--json"] + (["--head", head] if os.path.isdir(head) else []),
-                           capture_output=True, text=True)
+        md = os.path.join(tmp, name + ".md")
+        r = subprocess.run([sys.executable, "-B", scan, patch, "--json"]
+                           + (["--head", head, "--convention-md", md] if os.path.isdir(head) else []),
+                           capture_output=True, text=True, env=dict(BASE_ENV, **cases[name].get("env", {})))
         if r.returncode != 0:
             raise Prep("%s: risk_scan exit %d — %s" % (name, r.returncode, " ⏎ ".join(r.stderr.strip().splitlines())[-200:]))
         try:
@@ -83,6 +90,15 @@ try:
             with open(patch, encoding="utf-8", errors="replace") as fh:
                 got["removed_paths"] = removed_paths(fh.read())
         bad = [k for k in KEYS if k in exp and got.get(k) != exp[k]]
+        if "detail_net" in exp:
+            got["detail_net"] = {k: (got.get("detail") or {}).get(k, {}).get("net_tokens") for k in exp["detail_net"]}
+            if got["detail_net"] != exp["detail_net"]:
+                bad.append("detail_net")
+        if "convention_md_has" in exp:
+            text = open(md, encoding="utf-8").read() if os.path.isfile(md) else ""
+            got["convention_md_has"] = [x for x in exp["convention_md_has"] if x in text]
+            if got["convention_md_has"] != exp["convention_md_has"]:
+                bad.append("convention_md_has")
         if bad:
             detail = ", ".join("%s: %s≠%s" % (k, got.get(k), exp[k]) for k in bad)
             print("FAIL  %-32s %s" % (name, detail)); fail += 1
@@ -93,6 +109,7 @@ except Prep as e:
     sys.stdout.flush()
     os._exit(3)
 
+shutil.rmtree(tmp, ignore_errors=True)
 print()
 print("%d/%d 통과" % (len(cases) - fail, len(cases)))
 print("RISK-SCAN-CELLS=%d PASS=%d FAIL=%d" % (len(cases), len(cases) - fail, fail))

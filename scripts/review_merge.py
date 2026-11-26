@@ -3,7 +3,8 @@
 #   `+++`·`---` 로 시작하는 소스 행을 파일 헤더로 오인하지 않는다(증거 재실측의 대상 텍스트를 모은다).
 """리뷰 발견의 결정론 병합 (S20 · 정본 `modules/peer-review-gates.md` § MergeContract).
 
-Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observation`·`exclude`)은 하지 않는다.
+Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observation`·`exclude`)은 하지 않는다. 단 하나 실리는 exclude 는
+Lead 가 입력 observations 로 이미 내린 기각을 옮긴 것이다(아래 Lead 관찰).
 
   dedup 키     파일 + line_range 겹침 + 축(§3). 축이 다르면 같은 자리라도 별건. craft 항목은 결함과 섞지 않는다
   경로         후보 경로를 diff 경로로 푼다(basename · `./` · git 따옴표 · 탭 꼬리) — 경로 의미는 diff_anchors.py 한 곳이다
@@ -17,13 +18,24 @@ Lead 가 손으로 하던 기계 작업만 한다 — 판정(`include`·`observa
                정상' · '확인 안 한 전제 위' · '근거 약함' 이 통합에서 떨어지고 severity 만 남았다). 원본 severity 는 남고 severityCap 에
                사유를 적는다 · kind 는 final-state-ok · premise-island · weak-evidence — 모르는 kind 는 거부(건너뛰면 cap 이 조용히 빠진다)
   GPT verdict  reverse → disposition question + oracle(§6 — 이종 검증에 삭제 권한을 주지 않는다). 등급은 hold 이고
-               보고서에는 question 에만 싣는다 · challenge → Lead 확인
+               보고서에는 question 에만 싣는다 · challenge → Lead 확인 · abstain(판정 보류 — F-153) → reverse 와 같이 question
+               (보류는 근거 부족 신호다 — 유지(agree)로 올리지 않는다)
   contested    교차 판정이 갈린 항목은 원본 severity 와 crossVerdicts 를 그대로 둔다(스크립트가 고르지 않는다)
   axisCoverage 축마다 한 행 — Claude(finding · none · not_applicable)와 GPT(axis_coverage: found · none · gap)를
                finding ≡ found > gap > none > not_applicable 로 고른다. 모르는 값은 gap 으로 센다(판정 못 함을 none 에
                묻지 않는다 · F-514). 양쪽 원래 행(값 · 사유)은 그대로 남긴다. 어느 입력에도 축 정보가 없으면 키가 없다
   입력 계약     severity 는 네 값 · confidence 는 0-100 숫자(없어도 된다) · id 는 겹치지 않는다(reviews 는 겹친 id 에 렌즈를
                붙여 가른다) · verdict 는 §6 네 종류이고 대상이 Claude 후보에 있다 — 어기면 거부. 알아보지 못하는 형태는 exit 2
+  Lead 관찰     Claude 입력 최상위 observations[{id, file, line_range, what, reason}] — Tier 0/1 Lead 가 후보로 올리기 전에 검토하고
+               기각한 관찰(F-643 — 머릿속 기각은 산출물에 흔적이 없어 '검토 후 기각' 과 '놓침' 을 가르지 못했다). 후보 claude:<id> 로
+               싣고 disposition exclude · disposition_reason(= reason) · observation true 를 단다 — 등급 · 그룹 · 귀속 · verdict 대상 밖이고
+               보고서는 report.exclude 에만 싣는다. Curate 커버리지(candidates ⊆ issues ∪ excluded ∪ covers)가 이 후보를 제외 표(E1~E8)로
+               끌어올린다. 다섯 칸 중 하나라도 비면 거부 · 배열이 아니면 exit 2 · 관찰이 없으면 출력은 예전 그대로(새 키 없음).
+               경로를 diff 에서 못 풀면(diff 밖 · 같은 basename 여럿) 거부하지 않고 pathNote 와 stderr 경고를 남긴다(스레드 대조에서 빠진다)
+  사전 병합본   --out 의 파일 이름이 merged.json 이면 옆 merged-prethread.json 에 첫 병합본을 고정한다(F-643 — 스레드를 읽은 뒤
+               재병합하면 사전 판이 덮였다). 같은 diff 의 고정본이 있으면 덮지 않는다 · 다른 diff 의 것(같은 작업 폴더의 지난 실행)은 바꾼다 ·
+               읽지 못하는 고정본은 두고 경고한다(나중 병합을 스레드 전 판으로 세지 않는다). 고정본에는 prethread.diffSha256 이 붙는다.
+               렌더러(render_review.py)가 existing-threads.json 과 대조해 '기존 스레드 대비 독립 발견' 표를 그린다
 
 모드
   --claude FILE (--gpt FILE | --gpt-unavailable 사유) --diff FILE [--out FILE]   병합
@@ -54,12 +66,14 @@ import tempfile
 OK, REJECT, UNRUN = 0, 1, 2
 SEVERITIES = ("critical", "major", "minor", "suggestion")
 GRADES = ("post", "hold", "suggestion")
-VERDICT_KINDS = ("agree", "supplement", "challenge", "reverse")   # §6
+VERDICT_KINDS = ("agree", "supplement", "challenge", "reverse", "abstain")   # §6 · abstain = F-153
 CONFIDENCE_FLOOR = 80                      # OVERRIDE 의 보고 하한과 같은 값 — 여기서는 삭제가 아니라 hold 로 쓴다
 CRAFT_AXES = ("idiom", "naming", "architecture", "ui_structure", "placement", "design_alternative")   # workflows/peer-review.js 와 같다
 AXIS_RANK = {"finding": 3, "found": 3, "gap": 2, "none": 1, "not_applicable": 0}
 AXIS_NAME = {3: "finding", 2: "gap", 1: "none", 0: "not_applicable"}
 LIMIT_KINDS = ("final-state-ok", "premise-island", "weak-evidence")   # 하나라도 있으면 severity 상한 suggestion(F-178 · 워크플로 judgmentSlots 의 limits)
+OBS_FIELDS = ("id", "file", "line_range", "what", "reason")   # Lead 관찰(F-643) — 위치가 없으면 기존 스레드와 대조하지 못한다
+MERGED_NAME, PRETHREAD_NAME = "merged.json", "merged-prethread.json"   # 피어 리뷰 병합본 고정 경로 · 그 옆 사전 병합본(F-643)
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 QUOTE_RE = re.compile(r"`([^`\n]+)`")
 # 워커가 근거에 섞어 쓴 심볼 도구 보고 줄(공백 · 백틱 · 맨 앞 `[` 하나를 걷으면 `symbol tools:` 로 시작) — 인용이 아니라 재실측에서 뺀다.
@@ -203,6 +217,26 @@ def candidate(item: dict, source: str, lens) -> dict:
         "counterVerdict": item.get("counterVerdict"),
         **({"limits": lim} if lim else {}),
     }
+
+
+def observations(doc) -> list:
+    """Claude 입력 최상위 observations — Lead 가 검토하고 기각한 관찰을 disposition exclude 후보로 옮긴다(F-643). 키가 없으면 []."""
+    raw = doc.get("observations") if isinstance(doc, dict) else None
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise Unrun("observations 가 배열이 아니다 — 관찰을 0건으로 세지 않는다")
+    out = []
+    for o in raw:
+        miss = [k for k in OBS_FIELDS if not isinstance(o, dict) or not str(o.get(k) if o.get(k) is not None else "").strip()]
+        if not miss and not spans(o["line_range"]):
+            miss = ["line_range(줄 번호)"]
+        if miss:
+            raise Reject(f"관찰 {str(o)[:80]} — {' · '.join(miss)} 가 비었다(observations[{{{', '.join(OBS_FIELDS)}}}] — 기각 사유 · 위치가 없으면 흔적이 아니다)")
+        out.append({"id": f"claude:{o['id']}", "source": "claude", "lens": "observation", "observation": True,
+                    "file": o["file"], "line_range": o["line_range"], "title": o["what"],
+                    "disposition": "exclude", "disposition_reason": o["reason"]})
+    return out
 
 
 def items_of(obj: dict, keys=("issues", "findings")):
@@ -362,8 +396,16 @@ def grade(c: dict) -> str:
     return "hold" if low else "post"
 
 
-def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=None) -> dict:
+def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=None, obs=()) -> dict:
     cands = [dict(c) for c in claude + gpt]
+    notes = [dict(o) for o in obs]                   # Lead 관찰 — 판정이 끝났다(exclude). 경로만 풀고 등급 · 그룹 · 귀속에 넣지 않는다
+    dup = sorted(i for i, k in collections.Counter(c["id"] for c in cands + notes).items() if k > 1)
+    if dup:
+        raise Reject(f"관찰 id 가 후보 id 와 겹친다 — {dup}(observations 의 id 는 issues 와 다르게 단다)")
+    for o in notes:
+        why = resolve_file(o, texts)
+        if why:   # 거부하지 않는다(diff 밖 파일의 관찰도 기각 흔적이다) — 그 경로는 스레드 path 와 맞지 않아 대조에서 빠진다는 것을 남긴다
+            o["pathNote"] = f"경로를 diff 에서 풀지 못했다({why}) — 기존 스레드 대조에서 빠진다"
     by_id = {c["id"]: c for c in cands}
     for c in cands:
         path_why = resolve_file(c, texts)
@@ -390,9 +432,11 @@ def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=
         elif kind == "challenge":
             c["leadCheck"] = True
             c["gptNote"] = v.get("note")
-        elif kind == "reverse":
+        elif kind in ("reverse", "abstain"):
             c["disposition"] = "question"
             c["oracle"] = v.get("oracle") or v.get("note") or "판별 방법 미기재 — Lead 가 적는다"
+            if kind == "abstain":
+                c["gptNote"] = "GPT 판정 보류 — 근거 부족 신호(유지로 올리지 않는다 · F-153)"
     for c in cands:
         c["grade"] = grade(c)
     groups = sorted(group(cands), key=lambda g: min((m.get("file") or "", (spans(m.get("line_range")) or [(0, 0)])[0][0], m["id"]) for m in g))
@@ -410,23 +454,29 @@ def merge(claude: list, gpt: list, verdicts: list, texts, gpt_unavailable, axes=
     if len(out) != len(cands):
         raise Reject(f"후보 보존 위반 — 입력 {len(cands)} ≠ 출력 {len(out)}(AC-4)")
     if any(c.get("disposition") == "exclude" for c in out):
-        raise Reject("disposition exclude 는 Lead 전용이다")
+        raise Reject("disposition exclude 는 Lead 전용이다 — 병합이 싣는 exclude 는 Lead 관찰(observations)뿐이다")
     # 보고서는 후보를 한 목록에만 싣는다 — question 은 등급 목록보다 앞선다(post 만 읽는 소비자가 GPT 가 뒤집은 항목을 게시하지 않게)
     report = {g: [c["id"] for c in out if c["grade"] == g and c["disposition"] != "question"] for g in GRADES}
     report |= {"question": [c["id"] for c in out if c["disposition"] == "question"],
                "leadCheck": [c["id"] for c in out if c["leadCheck"]]}
+    graded = out
+    notes.sort(key=lambda o: (o.get("file") or "", spans(o["line_range"])[0][0], o["id"]))
+    out = graded + notes                             # AC-4 — 관찰도 후보로 남는다(Curate 커버리지가 처분을 요구한다)
+    if notes:
+        report["exclude"] = [o["id"] for o in notes]
     result = {
         "schemaVersion": 1,
         "inputs": {"claude": len(claude), "gpt": len(gpt), "gptVerdicts": len(verdicts), "gptUnavailable": gpt_unavailable,
-                   "evidenceChecked": texts is not None},
+                   "evidenceChecked": texts is not None, **({"observations": len(notes)} if notes else {})},
         "candidates": out,
         "groups": gsum,
         "report": report,
-        "summary": {"candidatesIn": len(cands), "candidatesOut": len(out), "groups": len(gsum),
+        "summary": {"candidatesIn": len(cands) + len(notes), "candidatesOut": len(out), "groups": len(gsum),
                     "attribution": {a: sum(1 for g in gsum if g["attribution"] == a) for a in ("both", "claude_only", "gpt_only")},
                     "grade": {k: len(report[k]) for k in (*GRADES, "question")},
-                    "contested": sum(1 for c in out if c.get("crossVerdict") == "contested"),
-                    "evidenceUnverified": sum(1 for c in out if c["evidenceVerified"] is False)},
+                    "contested": sum(1 for c in graded if c.get("crossVerdict") == "contested"),
+                    "evidenceUnverified": sum(1 for c in graded if c["evidenceVerified"] is False),
+                    **({"observations": len(notes)} if notes else {})},
     }
     if axes is not None:
         result["axisCoverage"] = axes
@@ -455,15 +505,55 @@ def run_merge(a) -> int:
         texts = hunk_text(pathlib.Path(a.diff).read_text(encoding="utf-8", errors="replace"))
     except OSError as e:
         raise Unrun(f"diff 를 읽을 수 없다 — {e}")
-    result = merge(claude_candidates(claude_doc), gpt, verdicts, texts, None if a.gpt else a.gpt_unavailable.strip(), axes)
+    result = merge(claude_candidates(claude_doc), gpt, verdicts, texts, None if a.gpt else a.gpt_unavailable.strip(), axes,
+                   observations(claude_doc))
     text = json.dumps(result, ensure_ascii=False, indent=1) + "\n"
+    pin = None
     if a.out:
         pathlib.Path(a.out).write_text(text, encoding="utf-8")
+        pin = pin_prethread(pathlib.Path(a.out), result, a.diff)
     else:
         sys.stdout.write(text)
     s = result["summary"]
-    print(f"MERGE OK — 후보 {s['candidatesIn']}→{s['candidatesOut']} · 그룹 {s['groups']} · {s['attribution']} · {s['grade']}", file=sys.stderr)
+    print(f"MERGE OK — 후보 {s['candidatesIn']}→{s['candidatesOut']} · 그룹 {s['groups']} · {s['attribution']} · {s['grade']}"
+          + (f" · 관찰 {s['observations']}(exclude)" if s.get("observations") else ""), file=sys.stderr)
+    for c in result["candidates"]:
+        if c.get("observation") and c.get("pathNote"):
+            print(f"OBSERVATION WARN — {c['id']} `{c.get('file')}`: {c['pathNote']}", file=sys.stderr)
+    if pin:
+        print(pin, file=sys.stderr)
     return OK
+
+
+def pin_prethread(out: pathlib.Path, result: dict, diff_path: str):
+    """--out 이 merged.json 이면 옆 merged-prethread.json 에 첫 병합본을 고정한다(F-643). 반환: stderr 한 줄 · 해당 없으면 None.
+    같은 diff 의 고정본은 덮지 않는다(write-once — 스레드를 읽은 뒤의 재병합이 사전 판을 지우지 않게) · 다른 diff 의 고정본(같은 작업 폴더의
+    지난 실행)은 바꾼다 · 읽지 못하는 고정본은 두고 경고한다 — 바꾸면 지금(스레드를 읽었을지 모르는) 병합을 스레드 전 판으로 센다."""
+    if out.name != MERGED_NAME:
+        return None
+    pin = out.with_name(PRETHREAD_NAME)
+    try:
+        sha = hashlib.sha256(pathlib.Path(diff_path).read_bytes()).hexdigest()
+    except OSError as e:
+        return f"PRETHREAD WARN — diff 를 다시 읽지 못해 고정하지 않았다({e})"
+    verb = "고정"
+    if pin.exists():
+        try:
+            old = json.loads(pin.read_text(encoding="utf-8"))["prethread"]["diffSha256"]
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            return (f"PRETHREAD WARN — {pin.name} 를 읽지 못해 그대로 두었다({type(e).__name__}) · 렌더러는 스레드 대비 표를 '셀 수 없음' 으로 둔다 — "
+                    "지우면 다음 병합이 스레드 전 판으로 고정된다(스레드를 이미 읽었다면 지우지 않는다)")
+        if old == sha:
+            return f"PRETHREAD 유지 — {pin.name} 는 같은 diff 의 첫 병합본이다(재병합은 덮지 않는다)"
+        verb = "교체(다른 diff — 지난 실행의 고정본)"
+    doc = dict(result, prethread={"diffSha256": sha})
+    tmp = pin.with_name(f".{pin.name}.tmp")
+    try:
+        tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        tmp.replace(pin)
+    except OSError as e:
+        return f"PRETHREAD WARN — {pin.name} 를 쓰지 못했다({e}) · 렌더러는 스레드 대비 표를 '셀 수 없음' 으로 둔다"
+    return f"PRETHREAD {verb} → {pin}"
 
 
 def check_fixture(d: pathlib.Path) -> int:
@@ -581,6 +671,11 @@ def self_test() -> int:
         case("reverse-grade — question 은 게시 등급 hold · 보고서는 question 에만(post · hold · suggestion 목록에 없다)",
              c["grade"] == "hold" and r["report"]["question"] == ["claude:A1"] and all("claude:A1" not in r["report"][g] for g in GRADES)
              and r["summary"]["grade"]["question"] == 1, (c["grade"], r["report"]))
+        r2 = M([issue("A1")], verdicts=[{"target": "A1", "verdict": "abstain", "note": "호출 순서를 재야 갈린다"}])
+        c2 = r2["candidates"][0]
+        case("f153-gpt-abstain-question — 판정 보류는 유지로 올리지 않고 question 으로(게시 등급 hold · foundBy 에 gpt-verdict 없음)",
+             c2["disposition"] == "question" and c2["grade"] == "hold" and "gpt-verdict" not in c2["foundBy"]
+             and r2["report"]["question"] == ["claude:A1"] and "보류" in c2.get("gptNote", ""), c2)
         cv = [{"by": "arch", "verdict": "agree"}, {"by": "quality", "verdict": "false_positive"}]
         r = M([issue("C1", sev="minor", crossVerdict="contested", crossVerdicts=cv)])
         c = r["candidates"][0]
@@ -768,7 +863,112 @@ def self_test() -> int:
             p = subprocess.run(argv + ["--claude", str(t / "bad.json"), "--gpt-unavailable", "시험"], capture_output=True, text=True)
             case("axis-bad-shape-exit2 axisCoverage 가 배열이 아니면 exit 2", p.returncode == UNRUN and "Traceback" not in p.stderr, p.stderr[-160:])
 
-    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_limits, t_inputs, t_fixture, t_cli, t_axes):
+    # F-643 — Lead 가 후보로 올리기 전에 기각한 관찰 · 스레드를 읽기 전 첫 병합본
+    obs_in = [{"id": "O1", "file": "a.swift", "line_range": "33", "what": "w-o1", "reason": "도달 경로 없음"},
+              {"id": "O2", "file": "src/b.swift", "line_range": 1, "what": "w-o2", "reason": "기존 관례와 같다"}]
+
+    def t_observations():
+        claude = [candidate(issue("A1"), "claude", "l")]
+        gpt = [candidate(issue("G1", file="src/b.swift", lr="1", ev="`new`"), "gpt", "gpt")]   # O2 와 같은 자리 — 관찰이 그룹에 들면 귀속이 both 로 바뀐다
+        plain = merge(claude, gpt, [], texts, None)
+        r = merge(claude, gpt, [], texts, None, obs=observations({"issues": [], "observations": obs_in}))
+        o1 = next((c for c in r["candidates"] if c["id"] == "claude:O1"), {})
+        case("f643-observation-exclude-candidate — 관찰은 disposition exclude + 사유 후보(경로는 diff 경로로) · report.exclude 에만 · 등급 · 그룹 · 귀속 밖",
+             o1.get("disposition") == "exclude" and o1.get("disposition_reason") == "도달 경로 없음" and o1.get("observation") is True
+             and o1.get("file") == "src/a.swift" and "grade" not in o1 and r["report"].get("exclude") == ["claude:O1", "claude:O2"]
+             and all(o1.get("id") not in r["report"][g] for g in (*GRADES, "question")) and r["groups"] == plain["groups"]
+             and r["summary"]["attribution"] == plain["summary"]["attribution"] == {"both": 0, "claude_only": 1, "gpt_only": 1}
+             and r["summary"]["candidatesIn"] == r["summary"]["candidatesOut"] == len(r["candidates"]) == 4
+             and r["summary"].get("observations") == r["inputs"].get("observations") == 2, (o1, r["report"], r["summary"]))
+        same = [merge(claude, gpt, [], texts, None, obs=observations(d)) for d in ({"issues": []}, {"issues": [], "observations": []})]
+        case("f643-no-observation-unchanged — 관찰 키가 없거나 빈 배열이면 출력이 예전 그대로(report.exclude · observations 키 없음)",
+             same[0] == same[1] == plain and "exclude" not in plain["report"] and "observations" not in plain["summary"]
+             and "observations" not in plain["inputs"], (list(plain["report"]), list(plain["summary"])))
+        bad = [[dict(obs_in[0], reason=" ")], [{k: v for k, v in obs_in[0].items() if k != "file"}], [dict(obs_in[0], line_range="끝 부분")], ["O1"]]
+        case("f643-observation-contract — 빈 칸 · 줄 번호 없음 · 객체 아님은 거부 · 배열이 아니면 exit 2 · issues id 와 겹침 · 관찰을 겨눈 verdict 는 거부",
+             all(raises(lambda b=b: observations({"observations": b}), Reject) for b in bad)
+             and raises(lambda: observations({"observations": {"O1": obs_in[0]}}), Unrun)
+             and raises(lambda: merge([candidate(issue("O1"), "claude", "l")], [], [], texts, None, obs=observations({"observations": obs_in[:1]})), Reject)
+             and raises(lambda: merge(claude, [], [{"target": "O1", "verdict": "agree"}], texts, None, obs=observations({"observations": obs_in[:1]})), Reject))
+        far = dict(obs_in[0], id="O3", file="nowhere.swift")
+        r = merge(claude, [], [], texts, None, obs=observations({"observations": [obs_in[0], far]}))
+        notes = {c["id"]: c.get("pathNote") for c in r["candidates"] if c.get("observation")}
+        me = pathlib.Path(__file__).resolve()
+        with tempfile.TemporaryDirectory(prefix="fz-review-merge-far-") as tmp:
+            (pathlib.Path(tmp) / "d.patch").write_text(DIFF, encoding="utf-8")
+            (pathlib.Path(tmp) / "c.json").write_text(json.dumps({"issues": [], "observations": [far]}), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(me), "--claude", str(pathlib.Path(tmp) / "c.json"), "--diff", str(pathlib.Path(tmp) / "d.patch"),
+                                "--gpt-unavailable", "시험"], capture_output=True, text=True)
+        case("f643-observation-unresolved-path-noted — diff 에서 못 푼 관찰 경로는 거부하지 않고 pathNote 를 남기고 stderr 에 경고한다(푼 경로엔 없다)",
+             notes.get("claude:O1") is None and "path_not_in_diff" in (notes.get("claude:O3") or "") and p.returncode == OK
+             and "OBSERVATION WARN — claude:O3" in p.stderr, (notes, p.returncode, p.stderr[-200:]))
+
+    def t_observation_curate():
+        # 커버리지(scripts/check_comment_worthy.py — 고치지 않았다)가 병합본의 관찰 후보를 제외 표로 끌어올린다
+        me = pathlib.Path(__file__).resolve()
+        with tempfile.TemporaryDirectory(prefix="fz-review-merge-obs-") as tmp:
+            t = pathlib.Path(tmp)
+            (t / "diff.patch").write_text(DIFF, encoding="utf-8")
+            (t / "lead.json").write_text(json.dumps({"issues": [issue("L1", ev="`let x = 2`")], "observations": obs_in[:1]}), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(me), "--claude", str(t / "lead.json"), "--diff", str(t / "diff.patch"),
+                                "--gpt-unavailable", "tier1 시험", "--out", str(t / "merged.json")], capture_output=True, text=True)
+            rv = {"verdict": "v", "target": {"kind": "pr", "ref": "pr-1", "sha": "abc1234def5678"}, "candidates": ["merged.json"], "issues": [],
+                  "excluded": [{"id": "claude:L1", "what": "w", "code": "E3", "reason": "측정값 없는 설계 선호"}]}
+
+            def curate(excluded):
+                (t / "review.json").write_text(json.dumps(dict(rv, excluded=excluded), ensure_ascii=False), encoding="utf-8")
+                return subprocess.run([sys.executable, str(me.parent / "check_comment_worthy.py"), str(t / "review.json")], capture_output=True, text=True)
+            lost = curate(rv["excluded"])
+            kept = curate(rv["excluded"] + [{"id": "claude:O1", "what": "w-o1", "code": "E1", "reason": "도달 경로 없음"}])
+            case("f643-curate-coverage-forces-exclusion — 병합본의 관찰을 excluded 에 두지 않으면 Curate 검사가 사라진 후보로 거부(exit 1) · 두면 통과",
+                 p.returncode == OK and "관찰 1(exclude)" in p.stderr and lost.returncode == 1 and "claude:O1" in lost.stdout + lost.stderr
+                 and kept.returncode == 0, (p.returncode, p.stderr[-200:], lost.returncode, (lost.stdout + lost.stderr)[-200:], kept.returncode))
+
+    def t_prethread():
+        me = pathlib.Path(__file__).resolve()
+        diff2 = DIFF.replace("+new", "+newer")
+        with tempfile.TemporaryDirectory(prefix="fz-review-merge-pre-") as tmp:
+            t = pathlib.Path(tmp)
+            (t / "diff.patch").write_text(DIFF, encoding="utf-8")
+            (t / "diff2.patch").write_text(diff2, encoding="utf-8")
+            (t / "o").mkdir()
+            pin = t / PRETHREAD_NAME
+
+            def run(lead, diff="diff.patch", out="merged.json"):
+                (t / "lead.json").write_text(json.dumps(lead), encoding="utf-8")
+                argv = [sys.executable, str(me), "--claude", str(t / "lead.json"), "--diff", str(t / diff), "--gpt-unavailable", "시험"]
+                return subprocess.run(argv + (["--out", str(t / out)] if out else []), capture_output=True, text=True)
+
+            def sha(s):
+                return hashlib.sha256(s.encode("utf-8")).hexdigest()
+            p1 = run({"issues": [issue("L1")], "observations": obs_in[:1]})
+            first = pin.read_bytes() if pin.is_file() else b""
+            doc = json.loads(first) if first else {}
+            merged = json.loads((t / "merged.json").read_text(encoding="utf-8")) if p1.returncode == OK else {}
+            case("f643-prethread-pinned — --out merged.json 이면 첫 병합본(관찰 포함)을 merged-prethread.json 에 고정 · diff 해시 · 고정 줄",
+                 p1.returncode == OK and doc.get("candidates") == merged.get("candidates") and len(doc.get("candidates") or []) == 2
+                 and (doc.get("prethread") or {}).get("diffSha256") == sha(DIFF) and "PRETHREAD 고정" in p1.stderr, (p1.returncode, p1.stderr[-200:]))
+            p2 = run({"issues": [issue("L1"), issue("L2", axis="correctness")]})   # 스레드를 읽은 뒤의 재병합 — 후보가 바뀌었다
+            now = json.loads((t / "merged.json").read_text(encoding="utf-8")) if p2.returncode == OK else {}
+            case("f643-prethread-write-once — 같은 diff 재병합은 고정본을 바이트 그대로 둔다(merged.json 만 새 판) · 유지 줄",
+                 p2.returncode == OK and pin.read_bytes() == first and [c["id"] for c in now.get("candidates", [])] == ["claude:L1", "claude:L2"]
+                 and "PRETHREAD 유지" in p2.stderr, (p2.returncode, p2.stderr[-200:]))
+            p3 = run({"issues": [issue("L1")]}, diff="diff2.patch")
+            got = json.loads(pin.read_text(encoding="utf-8")) if pin.is_file() else {}
+            case("f643-prethread-new-diff-replaced — 다른 diff(같은 작업 폴더의 지난 실행)의 고정본은 바꾼다 · 교체 줄",
+                 p3.returncode == OK and (got.get("prethread") or {}).get("diffSha256") == sha(diff2) and "교체" in p3.stderr, (p3.returncode, p3.stderr[-200:]))
+            p4 = run({"issues": [issue("L1")]}, out="o/other.json")
+            p5 = run({"issues": [issue("L1")]}, out=None)
+            case("f643-prethread-other-out-none — --out 이름이 merged.json 이 아니거나 stdout 이면 옆 파일을 만들지 않는다",
+                 p4.returncode == p5.returncode == OK and sorted(q.name for q in (t / "o").iterdir()) == ["other.json"]
+                 and "PRETHREAD" not in p4.stderr + p5.stderr, (p4.returncode, p5.returncode, p4.stderr[-120:]))
+            pin.write_text("{깨짐", encoding="utf-8")
+            p6 = run({"issues": [issue("L1")]})
+            case("f643-prethread-unreadable-kept — 읽지 못하는 고정본은 두고 경고한다(지금 병합을 스레드 전 판으로 세지 않는다)",
+                 p6.returncode == OK and pin.read_text(encoding="utf-8") == "{깨짐" and "PRETHREAD WARN" in p6.stderr, (p6.returncode, p6.stderr[-200:]))
+
+    for t in (t_group, t_evidence, t_paths, t_verdicts, t_attribution, t_grades, t_limits, t_inputs, t_fixture, t_cli, t_axes,
+              t_observations, t_observation_curate, t_prethread):
         try:
             t()
         except Exception as e:   # ⛔ 케이스 안의 예외는 FAIL 로 센다 — 크래시로 끝나면 몇 건이 안 돌았는지 모른다

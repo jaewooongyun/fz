@@ -1,0 +1,15 @@
+diff --git a/src/ScheduleCell.swift b/src/ScheduleCell.swift
+index 1111111..2222222 100644
+--- a/src/ScheduleCell.swift
++++ b/src/ScheduleCell.swift
+@@ -10,8 +10,6 @@ final class ScheduleCell {
+     func configure(_ item: ScheduleItem) {
+         title.text = item.title
+-        if !isLoggedIn && item.isGrade19 {
+-            thumbnail.isBlinded = true
+-        }
+-        badge.isHidden = item.gradeCode == nil
++        thumbnail.isBlinded = item.isBlinded
++        badge.isHidden = item.badge == nil
+     }
+ }

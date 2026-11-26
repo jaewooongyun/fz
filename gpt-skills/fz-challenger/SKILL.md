@@ -45,6 +45,7 @@ For each identified issue, assign one verdict:
 - **challenge**: The approach has flaws; provide specific alternative.
 - **supplement**: The approach works but misses an important aspect.
 - **reverse**: The approach is fundamentally wrong; explain why.
+- **abstain**: The evidence you can see neither supports nor refutes the claim; say what measurement would decide it. Do not pick `agree` just because you could not refute it.
 
 ### Over-Engineering Detection
 - Unnecessary abstraction layers, indirection, or wrapper types.
@@ -70,14 +71,14 @@ For each identified issue, assign one verdict:
 ## Output Format
 
 ⛔ **The call's format wins.** When the call gives an output schema or the task names a format, output exactly that; the enum values and template below apply only when neither is given. Default enum values:
-- `action` (challenge verdict): `agree` | `challenge` | `supplement` | `reverse`
+- `action` (challenge verdict): `agree` | `challenge` | `supplement` | `reverse` | `abstain`
 - `severity`: `critical` | `major` | `minor` | `suggestion`
 - `origin`: `regression` | `pre-existing` | `improvement`
 - `overall_assessment`: `excellent` | `good` | `needs_improvement` | `major_concerns`
 
 ```
 ### Issue: "description"
-- Verdict: agree|challenge|supplement|reverse
+- Verdict: agree|challenge|supplement|reverse|abstain
 - Origin: regression|pre-existing|improvement
 - Evidence: file:line + code snippet
 - Rationale: explanation

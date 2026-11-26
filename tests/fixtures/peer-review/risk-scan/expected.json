@@ -1,5 +1,5 @@
 {
-  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs · convention_deviations 중 셀에 적힌 것만이다(`<셀>.head/` 가 있으면 --head 로 넘긴다). before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
+  "note": "risk_scan.py 회귀 기대값. ⛔ 눈으로 확인하지 말고 run.sh 로 판정한다. added_lines 는 numstat_fallback 의 독립 python 오라클로 교차 검산 가능하다(같은 diff 를 다른 파서가 센다). 비교 키는 risk · added_lines · tier_delta · files · removed_paths · categories · runtime_axes · doc_contract_deleted · plugin_refs · convention_deviations · pr_tests · convention_md_has · detail_net 중 셀에 적힌 것만이다(`<셀>.head/` 가 있으면 --head · --convention-md 로 넘긴다 · 셀의 env 는 그 셀 실행에만 더한다). before_f381 은 F-381 수정 전 트리(be8c871)의 실측 기록이고 비교하지 않는다.",
   "cases": {
     "negative-interactor": {
       "risk": 0,
@@ -9,6 +9,7 @@
     "negative-doc-only": {
       "risk": 0,
       "added_lines": 0,
+      "pr_tests": [],
       "why": "문서에 적힌 auth·token·public func 는 런타임 위험이 아니다. 파일 자체를 수집에서 뺀다"
     },
     "negative-local-var": {
@@ -138,6 +139,16 @@
     "lang-scope-swift": {"plugin_refs": {"Swift Concurrency": ["async-await-basics", "tasks"]}, "categories": ["concurrency"], "why": "양성 대조: ts 셀과 같은 표본을 .swift 에 넣으면 참조가 나온다"},
     "lang-scope-mixed": {"plugin_refs": {"Swift Concurrency": ["actors"]}, "categories": ["concurrency"], "why": "혼합 diff 는 파일별로 가른다 — .ts 의 async 는 빠지고 .swift 의 @MainActor 만 참조를 부른다"},
     "lang-scope-swift-upper-ext": {"plugin_refs": {"Swift Concurrency": ["actors"]}, "categories": ["concurrency"], "why": "확장자는 대소문자를 가리지 않는다 — .SWIFT 도 Swift 파일이다"},
-    "f516-convention-deviation-collected": {"convention_deviations": [{"path": "src/StoreVC.swift", "role": "onSelect", "line": 15, "missing": ["!isCheckoutLocked"], "siblings": 2}]}
+    "f516-convention-deviation-collected": {"convention_deviations": [{"path": "src/StoreVC.swift", "role": "onSelect", "line": 15, "missing": ["!isCheckoutLocked"], "siblings": 2}], "convention_md_has": ["`src/StoreVC.swift:15` `onSelect` — 형제 2곳이 모두 가진 조건 없음: `!isCheckoutLocked`", "형제 술어 관례와 다른 판정식 없음"]},
+    "f083-content-access-axis": {"categories": ["content_access"], "risk": 0, "tier_delta": 0, "why": "F-083: 등급 토큰(gradeCode · isGrade19)이 순증한 diff 는 관점 축 content_access 가 붙는다 — risk · tier_delta 는 그대로(Tier 를 올리지 않는다)"},
+    "f083-content-access-removal": {"categories": ["content_access"], "risk": 0, "tier_delta": 0, "why": "F-083 반전: 클라이언트 등급 블러를 지우고 서버 값으로 바꾼 diff — 추가 행에 등급 토큰이 없어도 순감이 신호다(양방향 축)"},
+    "f083-content-access-each-word": {"categories": ["content_access"], "risk": 0, "detail_net": {"content_access": {"rating": 1, "age": 1, "adult": 1, "parental": 1, "guardian": 1, "grade": 1}}, "why": "어휘 갈래마다 한 번씩(등급 rating · grade · 연령 age · 성인 adult · 보호자 parental · guardian) — 갈래 하나를 빼면 이 셀이 갈린다"},
+    "f083-content-access-move-pair": {"categories": [], "risk": 0, "why": "같은 줄을 옮긴 짝(gradeCode 1:1)은 조용하다 — 양방향이어도 추가 = 삭제면 성립하지 않는다"},
+    "f083-content-access-negative-words": {"categories": [], "risk": 0, "why": "낱말 중간의 grade · age · rating(upgrade · usage · iterating · generating · percentage · AGENT_ID · userAgent)과 블러 어휘(UIBlurEffect · isBlinded — 프로젝트 토큰은 env)는 걸리지 않는다"},
+    "f083-content-access-env-token": {"categories": ["content_access"], "risk": 0, "env": {"FZ_RISK_CONTENT_ACCESS_TOKENS": "Blind"}, "why": "프로젝트 고유 토큰은 env 로 더한다 — env 없는 negative-words 셀의 isBlinded 는 미발화(대조)"},
+    "f516-predicate-convention-deviation": {"convention_deviations": [{"path": "src/Link.swift", "line": 7, "subject": "scheme", "form": ["http", "https"], "convention": ["https"], "tally": [3, 1]}], "convention_md_has": ["`src/Link.swift:7` `scheme` 판정식 {http, https} — 형제 관례 {https} 3 : 이번과 같은 형 1"], "why": "F-516 오라클 ②: 스킴 판정식이 형제 관례(https 단독 3 : http · https 허용 1 — 바뀌지 않은 줄만 · 두 파일 · ?.lowercased() · [..].contains 꼴 포함)의 상위 집합으로 이탈. 서로소인 kind == \"live\"(형제 movie · episode)는 다른 분기라 내지 않는다"},
+    "f516-predicate-convention-follows": {"convention_deviations": [], "convention_md_has": ["형제 술어 관례와 다른 판정식 없음"], "why": "대조: 같은 형제 위에서 바뀐 판정식이 관례(https 단독)를 따르면 0건"},
+    "f580-pr-tests-collected": {"pr_tests": [{"path": "Tests/MediaPlayerTests/AdVideoLayerTrackingTests.swift", "suites": ["AdVideoLayerKVCTests", "AdVideoLayerTrackingTests"]}, {"path": "Tests/MediaPlayerTests/Mocks/MockLayer.swift", "suites": []}, {"path": "tests/test_api.py", "suites": ["test_api"]}], "risk": 0, "why": "F-580: diff 가 더하거나 고친 테스트 파일과 스위트(XCTestCase 클래스 · 없으면 테스트 꼴 파일 이름 줄기 · 보조 파일은 빈 목록). 지운 LegacyTests 는 돌릴 것이 없어 빠진다 · 위험이 아니다(risk 0)"},
+    "f580-pr-tests-none": {"pr_tests": [], "why": "대조: Contest/ · Testimonial · attestation 은 테스트 경로가 아니다"}
   }
 }

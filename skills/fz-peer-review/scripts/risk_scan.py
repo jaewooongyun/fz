@@ -79,6 +79,20 @@ CATEGORIES = {
 #   analytics(F-515): 새 분기 술어의 입력 클래스(nil · 빈 값 · 스킴)마다 나가는 클릭 · 노출 로그 · 이동. 프로젝트 고유 트래커 이름은
 #     플러그인에 박지 않고 env FZ_RISK_ANALYTICS_TOKENS(정규식 갈래)로 더한다.
 #   animation(F-134): 가역 전환이면 정 · 역재생 두 시간 프로파일이 생긴다 — 코드를 읽어서는 둘째가 보이지 않는다.
+#   content_access(F-083): 등급 · 연령 · 성인 · 보호자 — 미성년 보호 게이팅을 뒤집은 diff 가 risk 0 · 카테고리 0 이었다(`gradeCode` · `isGrade19`
+#     가 어느 패턴에도 안 걸렸다). Tier 를 올릴 근거는 없어(엔트리 — 과승격 억제 압력) 표지만 붙인다. ⛔ 게이팅을 **지우는** 것이 반전이라
+#     이 축은 양방향(TWO_WAY_AXES)으로 센다. 낱말 시작에만 건다(_camel_word) — `upgrade` · `usage` · `generating` 안의 grade · age · rating 은
+#     낱말 중간이다. 프로젝트 고유 토큰(블러 · 블라인드 처리 이름 등)은 env FZ_RISK_CONTENT_ACCESS_TOKENS(정규식 갈래)로 더한다.
+
+
+def _camel_word(w):
+    """식별자 안 낱말 시작에만 걸리는 갈래 — 앞이 글자가 아니거나(gradeCode · CONTENT_GRADE) 소문자 · 숫자 뒤 대문자 시작(isGrade19)."""
+    return r"(?:(?<![A-Za-z])(?i:%s)|(?<=[a-z0-9])%s(?i:%s))" % (w, w[0].upper(), w[1:])
+
+
+# age 는 짧아 끝 경계도 건다 — 소문자 age/Age 뒤 소문자(agent · ages)와 대문자 AGE 뒤 글자(AGENT_ID)는 다른 낱말이다
+_AGE = r"(?:(?<![A-Za-z])[aA]ge(?![a-z])|(?<=[a-z0-9])Age(?![a-z])|(?<![A-Za-z])AGE(?![A-Za-z]))"
+
 AXIS_CATEGORIES = {
     "analytics": (
         r"(?i)(?:analytics|logEvent|trackEvent|sendEvent|tracker|impression|clickLog|logClick)",
@@ -88,7 +102,15 @@ AXIS_CATEGORIES = {
         r"(?:\.animation\(|\bwithAnimation\b|\bAnimatable\b|\banimatableData\b|\bUIView\.animate\b|\bCABasicAnimation\b|\btimingFunction\b)",
         "애니메이션 곡선 — 가역 전환이면 정 · 역재생 시간 프로파일을 둘 다 인쇄해 본다",
     ),
+    "content_access": (
+        "|".join([_camel_word("grade"), _camel_word("rating"), _AGE, _camel_word("adult"), _camel_word("parental"), _camel_word("guardian")]),
+        "콘텐츠 접근 제한(등급 · 연령 · 성인 · 보호자) — 누가 무엇을 볼 수 있는지 바뀌는지 따로 본다(지운 게이팅 포함)",
+    ),
 }
+# 관점 축의 프로젝트 고유 토큰 env — 값은 정규식 갈래로 그 축 패턴 뒤에 `|(?i:…)` 로 붙는다(대소문자 무시)
+AXIS_ENV = {"analytics": "FZ_RISK_ANALYTICS_TOKENS", "content_access": "FZ_RISK_CONTENT_ACCESS_TOKENS"}
+# 순감도 신호인 관점 축 — 토큰별 추가 ≠ 삭제면 성립한다(같은 수 짝 = 개명 · 이동은 조용하다). 나머지 축 · 카테고리는 순증만 센다
+TWO_WAY_AXES = frozenset({"content_access"})
 
 # 실행 필요 축 (F-258) — 렌즈가 읽기만으로 판정할 수 없는 축. 있으면 Lead 가 격리 프로브를 돌리거나 GPT 에 명시 질문으로 넘긴다.
 #   ⛔ 위험이 아니다 — risk 에 넣지 않는다. 추가 행 순증 토큰만 센다(개명 · 이동 짝은 지운다).
@@ -107,6 +129,14 @@ GUARD_RE = re.compile(r"\bguard\s+(.*?)\s+else\b")
 NOT_ROLES = frozenset("map filter compactMap flatMap forEach reduce sorted sort first contains allSatisfy sink receive "
                       "then catch async sync main if else switch case default do".split())
 SIBLING_MIN = 2
+# 술어 관례 (F-516 오라클 ②) — 같은 주어(마지막 식별자 — `url.scheme?.lowercased()` → scheme)를 문자열 리터럴과 견주는 판정식마다 줄 단위
+#   리터럴 집합을 `--head` 아래 **바뀌지 않은** 줄에서 센다. 이번 판정식의 집합이 형제 관례 집합(2곳 이상 · 이번 형보다 많다)의
+#   진부분 · 진상위 집합이면(https 단독 ↔ http · https 허용) 그 차를 N:M 으로 낸다. 서로소 집합(kind == "movie" ↔ "live")은 다른 분기라 뺀다.
+#   판정은 렌즈 · Lead(Gate 4.9 [관례 이탈]). ⚠️ 범위는 --head 가 담은 파일이다 — gather 의 head/ 는 바뀐 파일만 담아 앱 전체 관례는
+#   그 안의 형제만큼만 보인다(0건 = '관례 이탈 없음' 이 아니다).
+_PRED_SUBJ = r"([A-Za-z_][\w?!]*(?:\(\))?(?:\.[A-Za-z_][\w?!]*(?:\(\))?)*)"
+PRED_EQ = re.compile(_PRED_SUBJ + r'\s*===?\s*"([^"\\\n]*)"|"([^"\\\n]*)"\s*===?\s*' + _PRED_SUBJ)
+PRED_IN = re.compile(r'\[\s*("[^"\\\n]*"(?:\s*,\s*"[^"\\\n]*")*)\s*\]\s*\.contains\(\s*' + _PRED_SUBJ)
 
 # 역방향 신호 — 키워드가 없어도 위험한 것.
 # 공유 가변 상태는 `actor`·`@MainActor` 없이도 data race 를 만든다.
@@ -141,6 +171,15 @@ LAUNCH_TOKENS = re.compile(
 LAUNCH_FILES = re.compile(
     r"(?:^|/)(?:(?:App|Scene)Delegate\.(?:swift|mm?)|main\.(?:swift|mm?|c|cc|cpp|go|rs|py|tsx|jsx)|__main__\.py"
     r"|Info\.plist|AndroidManifest\.xml|MainActivity\.(?:kt|java))$")
+
+# PR 테스트(pr_tests · F-580) — diff 가 더하거나 고친 테스트 파일. 작성자가 고정하려는 동작의 신호인데 아무도 돌리지 않았다(새 테스트 17건 중
+#   1건이 결정적으로 실패했는데 정적 렌즈 · GPT 독립 패스 · Curate 가 모두 통과시켰다). ⛔ 위험(risk)이 아니다 — Tier 를 올리지 않고
+#   PR 테스트 실행 단계(modules/peer-review-tiers.md)가 무엇을 돌릴지 정하는 입력이다. 지운 테스트 파일은 돌릴 것이 없어 뺀다(추가 행 1줄 이상).
+TEST_PATH = re.compile(
+    r"(?:^|/)(?:[^/]*Tests?|tests?|__tests__|specs?)/"                     # 테스트 폴더 — Tests/ · FooTests/ · test/ · __tests__/ · spec/
+    r"|(?:Tests?|Spec)\.(?:swift|kt|java|m|mm)$|(?:^|/)test_[^/]*\.py$|_test\.(?:py|go)$|\.(?:test|spec)\.[jt]sx?$")
+TEST_NAME = re.compile(r"(?:Tests?|Spec)\.(?:swift|kt|java|m|mm)$|(?:^|/)test_[^/]*\.py$|_test\.(?:py|go)$|\.(?:test|spec)\.[jt]sx?$")
+XCTEST_CLASS = re.compile(r"\b(?:class|struct)\s+(\w+)\s*:\s*(?:XCTest\.)?XCTestCase\b")
 
 
 LOW_CONFIDENCE = {
@@ -254,19 +293,27 @@ def scan(diff_text):
     #    승격하지 않는다. Tier 승격은 휴리스틱이고 cap 이 Tier 2 이므로 감수한다 —
     #    동시성 표면을 줄이는 변경이 실제로 더 안전하다는 판단이다.
     hits = {}
-    extra = os.environ.get("FZ_RISK_ANALYTICS_TOKENS", "").strip()
-    axis = {k: ((p + "|(?:%s)" % extra) if k == "analytics" and extra else p, lab) for k, (p, lab) in AXIS_CATEGORIES.items()}
+    axis = {}
+    for k, (p, lab) in AXIS_CATEGORIES.items():
+        extra = os.environ.get(AXIS_ENV[k], "").strip() if k in AXIS_ENV else ""
+        axis[k] = ((p + "|(?i:%s)" % extra) if extra else p, lab)
     for name, (pattern, label) in list(CATEGORIES.items()) + list(axis.items()):
+        two_way = name in TWO_WAY_AXES
         added_tokens = _tally(re.findall(pattern, blob))
-        if not added_tokens:
+        removed_tokens = _tally(re.findall(pattern, removed_blob)) if added_tokens or two_way else {}
+        if not added_tokens and not removed_tokens:
             continue
-        removed_tokens = _tally(re.findall(pattern, removed_blob))
         # ⛔ **토큰별로** 센다. 카테고리 합계로 세면 같은 카테고리 안의 **치환**을 놓친다 —
         #    실측: `-await other()` / `+Task { detached() }` 는 concurrency 합계 1:1 이라
         #    net 0 이 되어 미발화했다. 구조적 동시성에서 비구조적으로 바뀐 **새 위험**인데도.
         #    토큰별이면 `task {` 가 1>0 이라 발화하고, 개명 짝(`@mainactor` 5:5)은 그대로 미발화다.
-        exceeded = {t: (c, removed_tokens.get(t, 0))
-                    for t, c in added_tokens.items() if c > removed_tokens.get(t, 0)}
+        # 양방향 축(TWO_WAY_AXES)은 순감도 센다 — 등급 게이팅을 지운 diff(F-083)는 추가 행에 토큰이 없다
+        if two_way:
+            exceeded = {t: (added_tokens.get(t, 0), removed_tokens.get(t, 0)) for t in set(added_tokens) | set(removed_tokens)
+                        if added_tokens.get(t, 0) != removed_tokens.get(t, 0)}
+        else:
+            exceeded = {t: (c, removed_tokens.get(t, 0))
+                        for t, c in added_tokens.items() if c > removed_tokens.get(t, 0)}
         if not exceeded:
             continue          # 순증한 토큰이 없다 — 이 PR 이 만든 위험이 아니다
         hit = {
@@ -304,6 +351,7 @@ def scan(diff_text):
 
     return {
         "launch_surface": launch_surface(by_file, removed_by_file, hunks),
+        "pr_tests": pr_tests(by_file, hunks),
         "categories": sorted(hits),
         # ⛔ 저신뢰 단독 카테고리 · 관점 카테고리(axis_only)는 risk 에서 뺀다 — detail/categories 에는 남아 사람이 본다.
         "risk": sum(1 for h in hits.values() if not h.get("low_confidence_only") and not h.get("axis_only")),
@@ -448,18 +496,82 @@ def convention_deviations(diff_text, head_root):
             missing = sorted(set.intersection(*[set(a) for a in sib]) - set(atoms or []))
             if missing:
                 out.append({"path": path, "role": role, "line": ln, "missing": missing, "siblings": len(sib)})
+    return out + predicate_deviations(diff_text, head_root)
+
+
+def _pred_subject(expr):
+    """`url.scheme?.lowercased()` → `scheme` — 호출 마디(`()`)를 빼고 마지막 식별자."""
+    segs = [s.strip("?!") for s in expr.split(".") if s and not s.endswith("()")]
+    return segs[-1] if segs and segs[-1] else None
+
+
+def predicate_forms(line):
+    """한 줄의 {주어: 리터럴 집합} — `scheme == "http" || scheme == "https"` → {scheme: {http, https}}."""
+    out = {}
+    for m in PRED_EQ.finditer(line):
+        subj, lit = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        s = _pred_subject(subj)
+        if s:
+            out.setdefault(s, set()).add(lit)
+    for m in PRED_IN.finditer(line):
+        s = _pred_subject(m.group(2))
+        if s:
+            out.setdefault(s, set()).update(re.findall(r'"([^"\\\n]*)"', m.group(1)))
+    return out
+
+
+def predicate_deviations(diff_text, head_root):
+    """F-516 ② — 바뀐 줄의 판정식이 형제 술어 관례(같은 주어 · 바뀌지 않은 줄)의 진부분 · 진상위 집합이면 그 차와 N:M."""
+    added = added_new_lines(diff_text)
+    occ = []                                    # (경로, 줄, 주어, 리터럴 집합, 바뀐 줄인가)
+    for dp, dirs, fs in os.walk(head_root):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for name in sorted(fs):
+            full = os.path.join(dp, name)
+            rel = os.path.relpath(full, head_root).replace(os.sep, "/")
+            if rel.lower().endswith(DOC_SUFFIXES):
+                continue
+            try:
+                text = Path(full).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for i, ln in enumerate(text.splitlines(), 1):
+                for subj, lits in predicate_forms(ln).items():
+                    occ.append((rel, i, subj, frozenset(lits), i in added.get(rel, ())))
+    out = []
+    for path, ln, subj, form, changed in occ:
+        if not changed:
+            continue
+        tally = {}
+        for _p, _l, s2, f2, c2 in occ:
+            if s2 == subj and not c2:
+                tally[f2] = tally.get(f2, 0) + 1
+        same = tally.get(form, 0)
+        conv = [(n, sorted(f2)) for f2, n in tally.items()
+                if f2 != form and (f2 < form or f2 > form) and n >= SIBLING_MIN and n > same]
+        if conv:
+            n, best = max(conv)
+            out.append({"path": path, "line": ln, "subject": subj, "form": sorted(form), "convention": best, "tally": [n, same]})
     return out
 
 
 def convention_md(devs):
     lines = ["# 형제 관례 대조 — 결정론 수집(판정 아님 · F-516)", "",
              "> 바뀐 클로저 · 분기마다 같은 파일의 같은 역할 형제(2곳 이상)가 **모두** 가진 guard 조건 중 이번 것에 없는 것이다.",
+             "> 술어 관례: 바뀐 판정식의 리터럴 집합이 같은 주어 형제 판정식(바뀌지 않은 줄 · head 범위) 관례의 진부분 · 진상위 집합인 자리다(N:M = 관례 형 : 이번과 같은 형).",
              "> 누락인지 의도인지는 렌즈 · Lead 가 정한다 — `modules/peer-review-gates.md` Gate 4.9 `[관례 이탈]`.", ""]
-    if not devs:
-        return "\n".join(lines + ["형제 대비 빠진 guard 조건 없음(대조 가능한 역할 블록 기준)."]) + "\n"
-    for d in devs:
+    guard = [d for d in devs if "role" in d]
+    pred = [d for d in devs if "subject" in d]
+    if not guard:
+        lines.append("형제 대비 빠진 guard 조건 없음(대조 가능한 역할 블록 기준).")
+    for d in guard:
         lines.append("- `%s:%d` `%s` — 형제 %d곳이 모두 가진 조건 없음: %s"
                      % (d["path"], d["line"], d["role"], d["siblings"], ", ".join("`%s`" % m for m in d["missing"])))
+    if not pred:
+        lines.append("형제 술어 관례와 다른 판정식 없음(같은 주어 문자열 비교 · head 범위 기준 — 범위 밖 형제는 세지 않았다).")
+    for d in pred:
+        lines.append("- `%s:%d` `%s` 판정식 {%s} — 형제 관례 {%s} %d : 이번과 같은 형 %d"
+                     % (d["path"], d["line"], d["subject"], ", ".join(d["form"]), ", ".join(d["convention"]), d["tally"][0], d["tally"][1]))
     return "\n".join(lines) + "\n"
 
 
@@ -477,6 +589,18 @@ def launch_surface(by_file, removed_by_file, hunks):
             if sig not in signals:
                 signals.append(sig)
     return {"flag": bool(signals), "signals": signals[:10]}
+
+
+def pr_tests(by_file, hunks):
+    """추가 행이 있는 테스트 파일 — [{path, suites}]. suites = 바뀐 hunk(추가 · 문맥 · 머리)의 XCTestCase 클래스 이름,
+    없으면 파일 이름이 테스트 꼴일 때 그 줄기(XCTest 관례상 클래스 이름 · pytest 모듈 이름), 그도 아니면 빈 목록(테스트 폴더의 보조 파일)."""
+    out = []
+    for path in sorted(p for p, lines in by_file.items() if p and lines and TEST_PATH.search(p)):
+        names = sorted({n for h in hunks if h["path"] == path for n in XCTEST_CLASS.findall("\n".join(h["text"]))})
+        if not names and TEST_NAME.search(path):
+            names = [os.path.splitext(os.path.basename(path))[0]]
+        out.append({"path": path, "suites": names})
+    return out
 
 
 def escalation(risk):
@@ -529,7 +653,7 @@ def main(argv):
             if "net_tokens" in d:
                 net = " (추가 %d / 삭제 %d · 순증 %s)" % (
                     d["added"], d["removed"],
-                    ", ".join("%s+%d" % (t, n) for t, n in sorted(d["net_tokens"].items())))
+                    ", ".join("%s%+d" % (t, n) for t, n in sorted(d["net_tokens"].items())))   # 양방향 축은 음수(순감)도 있다
             else:
                 net = ""
             print("  %-13s %s%s%s  %s" % (name, d["label"], note, net, ", ".join(d["samples"])))

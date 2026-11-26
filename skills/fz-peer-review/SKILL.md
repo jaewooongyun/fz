@@ -84,7 +84,7 @@ metadata:
 | `modules/peer-review-finding-anatomy.md` | 발견 서술 원칙 3 + 형태 예시 4종 (필드 위에 얹는 서술 계약) |
 | `modules/team-facing-writing.md` | 팀원에게 가는 글(코멘트 · 답글 · PR 본문)의 어조 · 형태 — Comment Style Guide 정본 |
 | `scripts/check_comment_worthy.py` | Curate 계약(카드 필드 · E1~E8 · 커버리지) — 렌더러가 `--require-curation` 으로 부른다 |
-| `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~f: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples) |
+| `modules/evidence-collection.md` | Gather 2.6-2.8 Evidence Collection 수집 절차 상세 (a~g: old-new-pairs, producer-consumer, deletion, base-patterns, caller-analysis, convention-samples, open-observations) |
 | `modules/plugin-refs.md` | SwiftUI Expert + Swift Concurrency 플러그인 — gather 의 risk.json `plugin_refs`(그 모듈 `## 자동 감지 트리거` 표 전체를 조건으로 잰 값 · Swift(`.swift`) 파일 추가 행만 — 파일별)가 비지 않으면 그 참조 항목을 Read 하고 review.json `pluginRefsRead[{plugin, refs}]` 에 적는다(F-520 · Curate 검사기가 대조) |
 | `modules/review-structural-axes.md` | 구조 판정 5축 (fz-review 공유). ⛔ Analyze 전 **Read 후** §3+§4(+§6 craft — 이 스킬은 기본 · 롤백 때는 뺀다)를 `args.structuralContext`로 전달 — arch 렌즈에만 주입 |
 | `skills/arch-critic/SKILL.md` | 관점 1(Architecture Decision) + 관점 2(Extensibility) |
@@ -162,6 +162,7 @@ mkdir -p ${WORK_DIR}/evidence
 | base 코드 패턴 | `evidence/base-patterns.md` | regression vs pre-existing 판별 |
 | 호출자 코드 | `evidence/caller-analysis.md` | init/DI의 실제 사용처 + 참조 타입 |
 | 프로젝트 convention 샘플 | `evidence/convention-samples.md` | 동일 패턴의 다른 모듈 (3+ = convention) |
+| 판정하지 않은 관찰 | `evidence/open-observations.md` | 수집 중 본 이상을 인용 + 관측만 넘긴다 · 판정은 렌즈 몫(Tier 2 · 3 필수 — F-105) |
 
 ### 2.7-2.8. Caller Analysis + Convention Sampling
 
@@ -235,6 +236,7 @@ Tier에 따라 팀 구성이 달라진다 (Tier 상세는 "4-Tier Graceful Degra
 ### Tier 0/1 분기
 - **Tier 0** → `modules/peer-review-tiers.md` §Tier 0 절차로 위임. 본 SKILL.md Analyze 후속 섹션(Gate 0 / Tier 2 / Tier 3) 모두 skip.
 - **Tier 1** → `modules/peer-review-tiers.md` §Tier 1 절차로 위임 + GPT challenger 1회 (Lead Bash). Gate 0 / Tier 2 / Tier 3 시퀀스 skip. ⊕ 기본으로 challenger 자리에 독립 첫 패스(아래 절 — `--no-gpt-independent` 면 challenger)
+- ⊕ **Lead 기각 관찰**(Tier 0/1 · F-643) — Lead 발견 입력 `${WORK_DIR}/review/lead-findings.json` 에 `issues` 와 함께 `observations[{id, file, line_range, what, reason}]` 를 적는다 — 검토했지만 후보로 올리지 않고 기각한 관찰이다(기존 스레드 `existing-threads.json` 을 읽기 **전**에 쓴다 · id 는 issues 와 겹치지 않게). `review_merge.py` 가 disposition exclude 후보(`disposition_reason` = reason · `observation: true`)로 `merged.json` 에 싣고, Curate 커버리지가 그 후보의 처분을 요구해 제외 표(E1~E8)에 오른다. Tier 0 은 GPT 가 없어도 같은 입력을 `--gpt-unavailable "Tier 0 — GPT 없음"` 으로 `--out "${WORK_DIR}/merged.json"` 에 병합한다. 병합 출력 이름이 `merged.json` 이면 첫 병합본이 옆 `merged-prethread.json` 에 고정된다(같은 diff 재병합은 덮지 않는다 · stderr `PRETHREAD 고정 | 유지 | 교체 | WARN`)
 - **Tier 2/3** → 아래 기존 시퀀스 실행.
 
 ### Orchestrator Bias 방지 규칙 (InputHygiene 계약)
@@ -372,8 +374,8 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
    - Tier 0/1: Lead 가 카드를 하나씩 반박해 보고 결과를 `refute` 에 적는다(Lead 카드)
    - Tier 2/3: 새 맥락 검증자 — `workflows/swarm.js` 를 `agentType: 'fz:review-counter'` 로 부른다. 조각 = 카드 ≤ 8장(넘으면 조각을 나눈다 · maxFragments 12 = 카드 96 상한 — 그 밖은 BLOCKED budget). 브리프 = 카드 id · 카드 본문 · 기존 스레드 스냅샷(고정 트리 밖이라 브리프에 인라인) · method = "카드마다 반박 시도 · 테스트 파일이 diff 에 있으면 연다(Gate 4.10) · 결과를 findings 에 `<카드 id>: upheld|refuted|blocked — 근거` 로" · 반환 뒤 심볼 도구 점검은 `guides/skill-authoring.md` §12 공용 읽기 전용 swarm 절 4단계(반환) 그대로
    - ⛔ Lead 는 **카드 id 집합 = findings 의 id 집합**인지 대조한다 — 누락 · BLOCKED · 예산 부족 카드는 코멘트로 두지 않고 ③ 질문 또는 excluded(E1)로 보낸다. `refute` 칸에 swarm run id 를 인용한다
-3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure(관례 표본 N:M 필수) · origin · suggestion · refute · comment · covers · 후보 원본에 premise-island 한정이 붙은 후보면 `premiseCheck{how: measured, note}`(그 전제를 잰 방법 — F-644) · 산문의 `path:line` 은 head 원문에 있는 줄이고 그 줄에 있어야 할 토큰은 `citeExpect{"path:line": 토큰}`(F-645) · major 이상이면 `chain[{step, grade: code|comment|inference}]` · `severity_basis{kind: output-change|path-only|zero-cases, note}`(주석 · 추론 단계나 경로만 · 사례 0 이면 minor 까지 — F-116 · F-090) · 제안 코드에 새 · SDK 심볼이 있으면 `symbol_notes{이름: new|sdk}`(F-063) · origin=regression 이면 `base_quote`(base 원문 인용 — F-037) · origin=regression 이면 `base_evidence` = `path:line@<base-sha.txt>`), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …)
-4. **review.json 머리** — risk.json `runtime_axes`(onChange · @State 캡처 · 제스처 · 상태 전환 — 읽기로 판정 못 하는 축)가 비지 않으면 축마다 `runtimeAxes[{axis, how: probe | gpt | none, note}]`(격리 프로브 · GPT 명시 질문 · 안 함은 사유 · F-258) · `plugin_refs` 가 비지 않으면 `pluginRefsRead[{plugin, refs}]`(F-520) — 둘 다 Curate 검사기가 risk.json 과 대조한다 · `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `matrix` = synthesized-issues.json 의 `matrix` 그대로(있을 때 — 렌더러가 `## Confidence Matrix` 절을 그린다) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 독립 패스 병합이 돌았으면(기본) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음) · GPT 없는 Tier 0 은 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
+3. **판정** — 카드마다 코멘트 또는 제외. 코멘트는 review.json `issues[]`(kind · evidence · repro · symptom_* · measure(관례 표본 N:M 필수) · origin · suggestion · refute · comment · covers · 후보 원본에 premise-island · weak-evidence 한정이 붙은 후보면 `premiseCheck{how: measured, note}`(그 전제 · 근거를 잰 방법 — F-644) · 산문의 `path:line` 은 head 원문에 있는 줄이고 그 줄에 있어야 할 토큰은 `citeExpect{"path:line": 토큰}`(F-645) · major 이상이면 `chain[{step, grade: code|comment|inference}]` · `severity_basis{kind: output-change|path-only|zero-cases, note}`(주석 · 추론 단계나 경로만 · 사례 0 이면 minor 까지 — F-116 · F-090) · 제안 코드에 새 · SDK 심볼이 있으면 `symbol_notes{이름: new|sdk}`(F-063) · origin=regression 이면 `base_quote`(base 원문 인용 — F-037) · origin=regression 이면 `base_evidence` = `path:line@<base-sha.txt>`), 제외는 `excluded[]`(`{id, what, code, reason}` · E5 = `duplicateOf` + 선택 `reply` 답글 초안 · E8 = `refute`). 같은 결함을 여러 후보가 말하면 `covers` 로 묶는다 — 한 후보는 소유자 하나다 제외 코드 E1~E8 의 뜻은 검사기 머리말이 정본이다(E1 도달 미확인 · E2 SDK 가정 · E4 원래 있던 문제 · E5 스레드 중복 · E8 반박됨 …) · 병합본의 Lead 관찰 후보(`observation: true` · disposition exclude)는 그 `disposition_reason` 을 reason 으로 `excluded[]` 에 코드를 달아 두거나, 재검증에서 살아나면 코멘트로 올려 `covers` 로 묶는다(F-643)
+4. **review.json 머리** — risk.json `runtime_axes`(onChange · @State 캡처 · 제스처 · 상태 전환 — 읽기로 판정 못 하는 축)가 비지 않으면 축마다 `runtimeAxes[{axis, how: probe | gpt | none, note}]`(격리 프로브 · GPT 명시 질문 · 안 함은 사유 · F-258) · `plugin_refs` 가 비지 않으면 `pluginRefsRead[{plugin, refs}]`(F-520) — 둘 다 Curate 검사기가 risk.json 과 대조한다 · `target` = `${WORK_DIR}/target.json` 그대로 · `meta.base_sha` = `${WORK_DIR}/base-sha.txt` 그대로(regression 근거의 기준 · F-037) · `matrix` = synthesized-issues.json 의 `matrix` 그대로(있을 때 — 렌더러가 `## Confidence Matrix` 절을 그린다) · `strengths` 마다 `strengthGaps[{claim, uncovered}]`(그 강점이 못 막는 시나리오) · `candidates` = 병합이 돌았으면(기본 독립 패스 · Tier 0 의 GPT 없는 병합) `["merged.json", "synthesized-issues.json"]` · `--no-gpt-independent`(challenger — 병합본 없음)는 `["synthesized-issues.json"]`(review.json 기준 상대 경로) · `gptPass` = 이번 실행의 GPT 경로(`independent` · `challenger` · `none` — 같은 작업 폴더에 지난 실행의 `gpt-independent/` 가 남아 있어도 challenger · none 이면 병합본을 요구하지 않는다)
 5. **검사** — `python3 "${FZ_PLUGIN_ROOT}/scripts/check_comment_worthy.py" "${WORK_DIR}/review.json"` 이 exit 0 이어야 Deliver 로 간다(렌더러가 `--require-curation` 으로 같은 검사를 한 번 더 한다). exit 1 은 고친다 · exit 2 는 판정 불가다(⛔ 통과 아님 — target · 후보 원본 · GPT 병합본을 확인한다)
 
 #### Gate Curate
@@ -383,6 +385,8 @@ ${WORK_DIR}/review-index.md          — Compact Recovery 엔트리 포인트
 ---
 
 ## Step: Deliver (전달)
+
+⛔ 렌더 · 게시 전에 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_evidence_slots.py" "${WORK_DIR}" --test-run --tier {Tier}` 가 exit 0 이어야 한다 — PR 이 더한 · 고친 테스트(`risk.json` `pr_tests`)를 돌린 결과 `review.json` `testRun` 또는 skipped `- test-run: <사유>` (F-580 · 절차 `modules/peer-review-tiers.md`)
 
 ### Comment Style Guide (PR 코멘트 톤)
 
@@ -409,7 +413,8 @@ Confidence Matrix(생성 경로는 `modules/peer-review-gates.md` § MergeContra
 - `${WORK_DIR}/pr-comments.md` — 이슈별 부드러운 톤 PR 코멘트 모음 (복사/붙여넣기용)
 - `${WORK_DIR}/*-result.json` — 에이전트/GPT 원본 결과
 - ⊕ 기본으로(`--render` 생략 가능) 리포트·코멘트를 따로 쓰지 않는다 — 판정·문장만 `${WORK_DIR}/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review "${WORK_DIR}/review.json" --diff "${WORK_DIR}/diff.patch" --out-dir "${WORK_DIR}" --require-curation` 가 위 두 문서와 `payload.json` · `render-preview.json` 을 만든다(`--require-curation` 은 기본 경로 — `--no-curate` 일 때만 뺀다 · Curate 계약 위반이면 렌더가 파일 없이 멈춘다)(줄 앵커는 `skills/fz-peer-review/scripts/diff_anchors.py` · 입력 형식은 렌더러 머리말). ⛔ 위 두 문서를 손으로 다시 쓰지 않는다 — 렌더러 출력이 단일 출처다. `--no-render` 면 렌더러를 부르지 않고 두 문서를 직접 쓴다(옛 경로)
-  - ⊕ 판정 한계 칸(렌더러가 절로 그린다 — 요약해 옮겨 쓰지 않는다): `unverifiedPremises` = Workflow 반환 `reviews[].unverifiedPremises` 에 렌즈 이름(`lens`)을 달아 그대로(`judgmentSlots` 기본 on · F-448) · `axisCoverage` = `merged.json` 의 `axisCoverage` 그대로(gap = 판정 안 함 · F-514 · F-559) · 외부 렌즈(GPT)가 낸 이슈의 `alternatives` · `recommended` 는 원문 그대로 그 issue 에(추천을 다른 말로 바꾸면 렌더러가 거부한다 · F-115) · `--no-curate` 로 렌더할 때 Lead 가 판단으로 뺀 관찰은 `dismissed[{id, what, reason}]` — 리포트 `## Lead 기각 — 의도 확인 후보` 와 synthesized-issues.json disposition exclude + 사유로 남는다(F-517 · 큐레이션 경로는 `excluded` 가 같은 일을 한다)
+  - ⊕ 판정 한계 칸(렌더러가 절로 그린다 — 요약해 옮겨 쓰지 않는다): `unverifiedPremises` = Workflow 반환 `reviews[].unverifiedPremises` 에 렌즈 이름(`lens`)을 달아 그대로(`judgmentSlots` 기본 on · F-448) · `axisCoverage` = `merged.json` 의 `axisCoverage` 그대로(gap = 판정 안 함 · F-514 · F-559) · 외부 렌즈(GPT)가 낸 이슈의 `alternatives` · `recommended` 는 원문 그대로 그 issue 에(추천을 다른 말로 바꾸면 렌더러가 거부한다 · F-115) · `--no-curate` 로 렌더할 때 Lead 가 판단으로 뺀 관찰은 `dismissed[{id, what, reason}]` — 리포트 `## Lead 기각 — 의도 확인 후보` 와 synthesized-issues.json disposition exclude + 사유로 남는다(F-517) · 큐레이션 경로(기본)는 후보로 올린 것을 `excluded` 로, 후보로 올리기 전에 기각한 것을 Tier 0/1 Lead 입력 `observations[]`(Analyze § Tier 0/1 분기)로 남긴다 — 병합이 그 관찰을 exclude 후보로 싣고 커버리지가 `excluded` 처분을 요구한다(F-643)
+  - ⊕ 기존 스레드 대비 독립 발견(F-643): `existing-threads.json` 에 diff 줄 스레드가 있으면 렌더러가 `merged-prethread.json`(스레드를 읽기 전 첫 병합본)과 대조해 `## 기존 스레드 대비 독립 발견`(스레드 id → 사전 후보 id | 관찰 id | 없음 · 집계 줄)을 그린다 — 손으로 세지 않는다. 고정본이 없거나 읽지 못하면 '셀 수 없음' 한 줄이다(challenger 경로 등 — 없음으로 세지 않는다) · 이 절은 리포트(로컬)에만 있고 게시 body 에서는 빠진다(내부 측정)
 
 #### --post 시 — 인라인 앵커 게시
 

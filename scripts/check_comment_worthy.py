@@ -28,11 +28,13 @@ issue(코멘트할 것) 필수:
   comment          코드 펜스 밖 산문 ≤ 4줄 · 마무리 어조(…부탁드립니다 · …여쭙습니다 · ?)가 없으면 WARN(차단 아님)
   duplicateOf      있으면 위반 — 중복은 E5 로 제외한다
   기존 스레드      existing-threads.json(status ok)에 같은 path ±3줄 스레드가 있으면 duplicateOf(→ 제외) 또는 distinctFrom[{thread, why}]
-  premiseCheck     id · covers 가 후보 원본(candidates[].limits)에 premise-island 한정이 붙은 후보면 premiseCheck{how: measured, note}
-                   (전제를 잰 기록) 필수 — 없거나 measured 가 아니면 위반 · 재지 못했으면 E1 로 제외한다. 한정은 review.json 이 아니라
-                   원본에서 읽는다(F-644 — 병합기의 한정은 severity 만 깎고 Curate 에 닿지 않았다)
+  premiseCheck     id · covers 가 후보 원본(candidates[].limits)에 premise-island(확인 안 한 전제) · weak-evidence(근거 약함) 한정이
+                   붙은 후보면 premiseCheck{how: measured, note}(전제 · 근거를 잰 기록) 필수 — 없거나 measured 가 아니면 위반 · 재지 못했으면
+                   E1 로 제외한다. final-state-ok 는 대상이 아니다. 한정은 review.json 이 아니라 원본에서 읽는다(F-644 — 병합기의 한정은
+                   severity 만 깎고 Curate 에 닿지 않았다)
 excluded[]       {id, what, code E1~E8, reason} · E5 = duplicateOf(+선택 reply 답글 초안) · E8 = refute
-산문 인용        issue comment · excluded reason · reply 의 `path:line[-line]` 을 review.json 폴더 head/<path> 원문과 대조한다 — 그 줄이 없으면 위반 ·
+산문 인용        issue comment · excluded reason · reply 의 `path:line[-line]` 을 review.json 폴더 head/<path> 원문과 대조한다 — 그 줄이 없거나
+                 구간이 전부 빈 줄 · 주석 표지만 있는 줄(`///` · `//` · `#` 뒤에 아무것도 없다 — 빈 doc 줄)이면 위반 ·
                  그 항목에 citeExpect{"path:line": "토큰"} 을 적었으면 그 줄(구간)에 토큰이 있어야 하고 산문에 없는 키도 위반이다. 다른 커밋
                  @sha 를 붙인 인용은 대조하지 않고, head/<path> 가 없으면 WARN(미검증)이다(F-645 — 눈으로 센 줄 번호가 어긋난 채 통과했다)
 strengths        string[] 그대로 · 원소마다 strengthGaps[{claim(= 그 강점), uncovered(그 강점이 못 막는 시나리오 — 비지 않음)}](F-117 · F-517)
@@ -80,9 +82,14 @@ REPRO = ("reproduced", "code-determined")
 EVIDENCE_RE = re.compile(r"(?s)^(?P<path>.+):(?P<a>\d+)(?:-(?P<b>\d+))?@(?P<sha>[0-9a-f]{7,40})$")   # 경로는 공백 · @ · : 를 가질 수 있다 — 끝의 :줄@sha 만 떼어 낸다
 CLOSING_RE = re.compile(r"(?:(?:부탁드립니다|여쭙습니다)[.!]?|\?)\s*$")
 PREMISE_ISLAND = "premise-island"   # review_merge.py LIMIT_KINDS 의 한정 — 확인하지 않은 전제에 기댄 후보(F-644)
+# premiseCheck 를 요구하는 한정(review_merge.py LIMIT_KINDS 중 final-state-ok 를 뺀 둘) — 값은 위반 문구의 뜻풀이(F-644)
+PREMISE_KINDS = {PREMISE_ISLAND: "확인하지 않은 전제", "weak-evidence": "근거 약함"}
 # 산문 속 줄 인용 `path:line[-line][@sha]` — 경로는 확장자가 있는 파일 꼴이라 '4:1' · '10:30' 같은 비율 · 시각은 잡지 않는다(F-645).
 # 경로 글자에 `+` 를 넣는다(ObjC 카테고리 `UIView+Layout.swift` — 빼면 `Layout.swift` 만 잡혀 대조가 빗나간다). 공백 · 괄호가 든 경로는 잡지 않는다
 CITE_RE = re.compile(r"(?<![\w./+-])(?P<path>[\w./+-]*\w\.[A-Za-z]\w*):(?P<a>\d+)(?:-(?P<b>\d+))?(?:@(?P<sha>[0-9a-f]{7,40}))?")
+# 인용이 가리킬 내용이 없는 줄 — 빈 줄 · 주석 표지(`///` · `//` · `#`)만 있는 줄(빈 doc 줄 · F-645 :397). 표지 뒤에 글이 있는 주석
+# (`/// 문장` — F-645 에서 바르게 고친 인용 :398)과 `#if` · `#selector` 같은 지시어는 내용이 있는 줄이다
+EMPTY_CITE_LINE = re.compile(r"(?://+|#+)?")
 NEAR = 3
 SHA_RE = re.compile(r"[0-9a-f]{7,40}\Z")
 MAJOR_UP = ("critical", "major")
@@ -245,8 +252,8 @@ def prose_lines(comment: str) -> list:
 
 
 def load_candidates(review: dict, base: pathlib.Path, premise: dict | None = None):
-    """(후보 id 집합, 출처 목록, UNRUN 사유 | None). premise 를 주면 원본 limits 에 premise-island 가 붙은 후보 id → 출처를 채운다
-    (normalize 는 limits 를 옮기지 않는다 — review.json 쪽 사본이 아니라 원본 항목에서 읽는다 · F-644)."""
+    """(후보 id 집합, 출처 목록, UNRUN 사유 | None). premise 를 주면 원본 limits 에 PREMISE_KINDS 한정이 붙은 후보 id → (출처, 한정 kind 들)을
+    채운다(normalize 는 limits 를 옮기지 않는다 — review.json 쪽 사본이 아니라 원본 항목에서 읽는다 · F-644)."""
     srcs = review.get("candidates")
     if not isinstance(srcs, list) or not srcs or not all(isinstance(s, str) and s for s in srcs):
         return None, [], "candidates(후보 원본 파일 목록 — merged.json · synthesized-issues.json)가 없다"
@@ -269,8 +276,9 @@ def load_candidates(review: dict, base: pathlib.Path, premise: dict | None = Non
             raw = data if isinstance(data, list) else data["issues"] if shape == "lead" else data["candidates"]
             for it in raw:
                 lim = it.get("limits")
-                if isinstance(lim, list) and any(isinstance(x, dict) and x.get("kind") == PREMISE_ISLAND for x in lim):
-                    premise.setdefault(str(it["id"]), rel)
+                kinds = [k for k in PREMISE_KINDS if isinstance(lim, list) and any(isinstance(x, dict) and x.get("kind") == k for x in lim)]
+                if kinds:
+                    premise.setdefault(str(it["id"]), (rel, kinds))
         used.append(rel)
     # 이번 실행의 GPT 경로를 review.json `gptPass` 로 밝혔으면(challenger · none) 남은 gpt-independent/ 로 병합본을 요구하지 않는다 —
     # 같은 작업 폴더에서 독립 패스 뒤 challenger 로 다시 돌린 경우다. 밝히지 않았으면 폴더가 안전망이다
@@ -320,7 +328,8 @@ def base_quote_misses(base: pathlib.Path, ms: list, quote: str) -> list:
 
 def cite_problems(base: pathlib.Path, sha: str, x: dict, fields) -> tuple:
     """(위반, 대조 못 한 인용) — x 의 산문 칸(fields)에 적은 `path:line[-line]` 을 head/<path> 원문과 대조한다(F-645).
-    범위는 둘뿐이다: 그 줄이 있는가 · citeExpect{인용: 토큰} 을 적었으면 그 토큰이 그 줄(구간)에 있는가.
+    범위는 셋뿐이다: 그 줄이 있는가 · 구간이 전부 빈 줄 · 주석 표지만 있는 줄은 아닌가 · citeExpect{인용: 토큰} 을 적었으면 그 토큰이
+    그 줄(구간)에 있는가.
     다른 커밋 @sha 를 붙인 인용(base 근거 등)과 head/ 에 없는 파일은 대조하지 않는다 — 부른 쪽이 미검증으로 드러낸다."""
     raw = x.get("citeExpect")
     exp = raw if isinstance(raw, dict) else {}
@@ -345,6 +354,10 @@ def cite_problems(base: pathlib.Path, sha: str, x: dict, fields) -> tuple:
             a, b = int(m["a"]), int(m["b"] or m["a"])
             if not 1 <= a <= b <= len(lines):
                 bad.append(f"산문 인용 `{cite}` — head/{m['path']} 는 {len(lines)}줄이라 그 줄이 없다(번호는 번호가 붙은 출력에서 옮긴다 · F-645)")
+                continue
+            if all(EMPTY_CITE_LINE.fullmatch(ln.strip()) for ln in lines[a - 1:b]):
+                bad.append(f"산문 인용 `{cite}` — 구간이 전부 빈 줄 · 주석 표지만 있는 줄이다(지금 그 줄: {lines[a - 1].strip()[:60]!r}) — "
+                           "문장을 받치는 줄을 번호가 붙은 출력에서 옮긴다(F-645)")
                 continue
             if cite in exp:
                 tok = exp[cite]
@@ -579,12 +592,14 @@ def check_review(review: dict, base: pathlib.Path):
             warn.append(f"{iid}: comment 마무리 어조(…부탁드립니다 · …여쭙습니다 · 질문)가 없다")
         if i.get("duplicateOf"):
             bad.append(f"{iid}: duplicateOf 가 있는 항목은 코멘트가 아니다 — E5 로 제외한다")
-        # ⛔ 병합기의 premise-island 한정은 severity 만 깎았다 — 그 후보를 코멘트로 올리려면 전제를 잰 기록이 있어야 한다(F-644)
+        # ⛔ 병합기의 premise-island · weak-evidence 한정은 severity 만 깎았다 — 그 후보를 코멘트로 올리려면 전제 · 근거를 잰 기록이 있어야 한다(F-644)
         lim = [t for t in dict.fromkeys([str(iid)] + [str(c) for c in i.get("covers") or []]) if t in premise]
         pc = i.get("premiseCheck") if isinstance(i.get("premiseCheck"), dict) else {}
         if lim and not (pc.get("how") == "measured" and _txt(pc.get("note"))):
-            bad.append(f"{iid}: 후보 {', '.join(lim)} 는 원본 {premise[lim[0]]} 에 {PREMISE_ISLAND} 한정(확인하지 않은 전제)이 있다 — "
-                       "전제를 잰 기록 premiseCheck{how: measured, note} 없이는 코멘트가 아니다 · 재지 못했으면 E1 로 제외한다(F-644)")
+            kinds = [k for k in PREMISE_KINDS if any(k in premise[t][1] for t in lim)]
+            bad.append(f"{iid}: 후보 {', '.join(lim)} 는 원본 {premise[lim[0]][0]} 에 "
+                       f"{' · '.join(f'{k} 한정({PREMISE_KINDS[k]})' for k in kinds)}이 있다 — "
+                       "전제 · 근거를 잰 기록 premiseCheck{how: measured, note} 없이는 코멘트가 아니다 · 재지 못했으면 E1 로 제외한다(F-644)")
         if threads:
             ds = {str(d.get("thread")) for d in i.get("distinctFrom") or [] if isinstance(d, dict) and _txt(d.get("why"))}
             for s in i.get("sites") or []:
@@ -861,6 +876,21 @@ def self_test() -> int:
                run(BASE)[0]]
         case("f644-premise-measured-or-excluded-ok — premiseCheck{how: measured, note} · E1 제외 · 한정 없는 후보는 통과(reasoned · 빈 note 는 위반)",
              got == [OK, VIOLATION, VIOLATION, OK, OK], got)
+        # F-644 남은 축 — weak-evidence 한정도 같은 대상이다 · final-state-ok 한정은 대상이 아니다(음성 대조)
+        wk = json.loads(json.dumps(MERGED))
+        wk["candidates"][0].update(limits=[{"kind": "weak-evidence", "note": "한 줄 인용뿐"}])
+        fs = json.loads(json.dumps(MERGED))
+        fs["candidates"][0].update(limits=[{"kind": "final-state-ok", "note": "사용자가 보는 최종 화면은 같다"}])
+        rw = run(BASE, merged=wk)
+        got = [rw[0], run(own, merged=wk)[0],
+               run(mi(premiseCheck={"how": "measured", "note": "근거 줄을 head 에서 다시 읽었다"}), merged=wk)[0],
+               run(mi(premiseCheck={"how": "reasoned", "note": "코드로 추론"}), merged=wk)[0],
+               run(mod(issues=[], excluded=BASE["excluded"] + [{"id": "claude:C1", "what": "근거 약함", "code": "E1", "reason": "근거 미확인"}]),
+                   merged=wk)[0],
+               run(BASE, merged=fs)[0]]
+        case("f644-weak-evidence-needs-premise-check — weak-evidence 한정 후보도 covers · id 로 올리면 premiseCheck{how: measured} 없이는 위반"
+             "(issue id · kind 지목) · measured · E1 제외는 통과 · final-state-ok 한정은 대상이 아니다",
+             got == [VIOLATION, VIOLATION, OK, VIOLATION, OK, OK] and any("A1" in b and "weak-evidence" in b for b in rw[1]), (got, rw[1]))
         # F-645 — 산문 속 `path:line` 인용을 head/ 원문과 대조(그 줄이 있는가 · citeExpect 토큰이 그 줄에 있는가)
         hd = {"head/src/a.swift": "func rollStep() {}\nlet items = load()\n"}
         cm = lambda c, ce=None: mi(comment=c + " 확인 부탁드립니다.", **({"citeExpect": ce} if ce is not None else {}))   # noqa: E731
@@ -895,6 +925,23 @@ def self_test() -> int:
         ok_ = run(cm("Sources/UIView+Layout.swift:2 의 호출부", {"Sources/UIView+Layout.swift:2": "load()"}), trees=hp)
         case("f645-cite-plus-path — `+` 가 든 경로(ObjC 카테고리 꼴)를 통째로 잡는다(뒷조각만 잡아 미검증으로 빠지지 않는다)",
              r[0] == VIOLATION and any("Sources/UIView+Layout.swift:42" in b for b in r[1]) and ok_[0] == OK and not ok_[2], (r[1], ok_))
+        # F-645 남은 축 — 구간이 전부 빈 줄 · 주석 표지만 있는 줄이면 위반(엔트리 :397 빈 doc 줄을 E5 reply 로 인용한 꼴).
+        # 줄: 1 import · 2 `///` · 3 `/// 문장`(엔트리가 바르게 고친 :398 꼴) · 4 빈 줄 · 5 `//` · 6 `#if DEBUG` · 7 `# ` · 8 코드
+        hc = {"head/src/b.swift": "import UIKit\n///\n/// 펼친 전체화면은 패널을 옆에 붙이지 않는다\n\n//\n#if DEBUG\n# \nlet x = 1\n"}
+        e5b = lambda reply: mod(excluded=[   # noqa: E731
+            {"id": "claude:C2", "what": "w", "code": "E5", "reason": "같은 스레드", "duplicateOf": 77, "reply": reply}, BASE["excluded"][1]])
+        rb = run(e5b("src/b.swift:2 에서 이미 다뤘습니다."), trees=hc)
+        got = [run(e5b("src/b.swift:3 에서 이미 다뤘습니다."), trees=hc)[0],
+               run(cm("src/b.swift:4-5 구간"), trees=hc)[0],
+               run(cm("src/b.swift:7 인용"), trees=hc)[0],
+               run(cm("src/b.swift:6 의 분기"), trees=hc)[0],
+               run(cm("src/b.swift:4-8 구간"), trees=hc)[0],
+               run(cm("src/b.swift:2 의 표지", {"src/b.swift:2": "///"}), trees=hc)[0]]
+        # 차례: 글이 있는 doc 줄 · 빈 줄 + `//` · `# ` 만 · `#if` 지시어 · 코드에 닿는 구간 · citeExpect 토큰이 맞아도 표지뿐인 줄은 위반
+        case("f645-cite-empty-or-marker-only-line — 구간이 전부 빈 줄 · 주석 표지만(`///` `//` `#`) 있는 줄이면 위반(E5 reply :397 꼴) · "
+             "글이 있는 doc 줄 · `#if` · 코드에 닿는 구간은 통과",
+             rb[0] == VIOLATION and any("excluded claude:C2" in b and "src/b.swift:2" in b and "빈 줄" in b for b in rb[1])
+             and got == [OK, VIOLATION, VIOLATION, OK, OK, VIOLATION], (rb[1], got))
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 

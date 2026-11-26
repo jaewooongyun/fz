@@ -23,6 +23,11 @@
      전부 코드 인용을 갖는다. `catch` 층은 catch 본문까지 인용한다 — 중간 층을 읽지 않고 '전파 확정' 을 적으면 catch 의 부수효과
      (nil 반환 · 다른 에러로 정규화)가 결론을 뒤집는다(F-009 · 승격 원장 D-1).
 
+PR 테스트 기록(`--test-run` · Deliver 앞 — F-580): Tier ≥ 1 이고 `risk.json` 의 `pr_tests`(diff 가 더하거나 고친 테스트 파일)가 비지 않으면
+  `review.json` 의 `testRun`(실행 결과 · 실패 · 미실행 사유 한 줄)이 있거나 `evidence/skipped.md` 에 `- test-run: <사유>` 가 있어야 한다.
+  ⛔ 기본 검사(①~⑤ · Gather 5.5 · GPT 정문 사전 검사)는 이것을 보지 않는다 — 그 시점에는 review.json 이 없다. 실행 기록도 남기지 않는다.
+  risk.json 이 없거나 판독 불가 · `pr_tests` 키가 없으면 판정 불가(2) — 테스트 0개로 읽지 않는다.
+
 profile(`--profile`): peer-review(기본 — ①~⑤) · plan · discover · fix · code · review(③ · ⑤ — 참조 탐색을 하는 스킬의 첫 단계 활성 기록 · F-534).
   code · review 는 plan 과 같은 검사다(구현 · 리뷰 스킬의 첫 단계 기록 — 워커 심볼 도구 점검이 이 기록으로 미사용 환경과 배선 고장을 가른다).
   plan · discover · fix · code · review 의 ③ 대상 = `target.json` 의 `root`(세션 대상 트리 — 같은 경로여야 한다) · `sha`(있으면 앞부분 일치).
@@ -256,6 +261,45 @@ def error_path_problems(work: str) -> list:
             layers.append((m.group(1), m.group(2).rstrip(), m.group(3)))
     close()
     return bad
+
+
+def test_run_check(work: str, tier_arg) -> int:
+    """F-580 — PR 이 더한 테스트를 돌린 기록. Deliver 앞에 부른다(review.json 이 생긴 뒤)."""
+    if not os.path.isdir(work):
+        log(f"UNRUN: WORK_DIR 없음 — {work}")
+        return UNRUN
+    tier = tier_arg if tier_arg is not None else tier_file(work)
+    if tier is None:
+        log("UNRUN: Tier 미상 — --tier 가 없고 tier.txt 를 읽지 못했다")
+        return UNRUN
+    if tier == 0:
+        print("PR 테스트 기록 검사 — Tier 0 · 대상 아님(Tier 1 이상)")
+        return OK
+    if "test-run" in skipped_ids(work):   # 사유를 적은 미실행은 risk.json 판독과 무관하게 통과 — risk_scan 이 결정적으로 실패한 diff 의 탈출구
+        print(f"PR 테스트 기록 검사 — Tier {tier} · skipped test-run(사유 있음)")
+        return OK
+    try:
+        risk = json.load(open(os.path.join(work, "risk.json"), encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        log(f"UNRUN: risk.json 판독 불가 — {type(e).__name__} · pr_tests 를 모르면 0개로 읽지 않는다(gather 재수집)")
+        return UNRUN
+    tests = risk.get("pr_tests") if isinstance(risk, dict) else None
+    if not isinstance(tests, list):
+        log("UNRUN: risk.json 에 pr_tests 가 없다 — risk_scan.py 가 이 판보다 낡았거나 실패했다(gather 재수집)")
+        return UNRUN
+    print(f"PR 테스트 기록 검사 — Tier {tier} · pr_tests {len(tests)}개")
+    if not tests:
+        return OK
+    try:
+        review = json.load(open(os.path.join(work, "review.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        review = None
+    run = review.get("testRun") if isinstance(review, dict) else None
+    if (isinstance(run, str) and run.strip()) or "test-run" in skipped_ids(work):
+        return OK
+    print(f"  ✗ pr_tests {len(tests)}개({', '.join(str(t.get('path')) for t in tests[:3] if isinstance(t, dict))}) 를 돌린 기록이 없다 — "
+          "review.json `testRun` 에 결과 한 줄(통과 · 실패 건수 · 미실행 사유) 또는 evidence/skipped.md 에 `- test-run: <사유>`")
+    return VIOLATION
 
 
 def check(work: str, tier_arg, doc_path: str = TIERS_DOC, profile: str = "peer-review"):
@@ -539,6 +583,53 @@ def self_test() -> int:
         ok_run, bad_run = run(os.path.join(t, "s-quiet"), d, "--tier", "0"), run(os.path.join(blocker, "runs"), d, "--tier", "0")
         case("record-quiet-stdout-exit", ok_run[0] == bad_run[0] == OK and ok_run[1] == bad_run[1] and "RUN" not in ok_run[1]
              and "RUN_METRICS_UNAVAILABLE" in bad_run[2], (ok_run[0], bad_run[0], ok_run[1][-80:], bad_run[2][-120:]))
+
+        # F-105 — Lead 미판정 관찰 슬롯: 표의 Tier 2/3 ✓ 가 실제 요구 슬롯이 된다(Tier 0/1 은 ⊕ — 요구하지 않는다)
+        d = slots("oo-miss", tier=2)
+        oo = os.path.join(d, "evidence", "open-observations.md")
+        if os.path.exists(oo):   # 표가 Tier 2 에 ✓ 를 두지 않으면 slots() 가 만들지 않는다 — 그때 셀은 예외가 아니라 FAIL 로 끝난다
+            os.remove(oo)
+        got = {"req": tuple("open-observations" in (required_slots(TIERS_DOC, k) or []) for k in range(4)), "miss": check(d, 2)}
+        open(os.path.join(d, "evidence", "skipped.md"), "w").write("- open-observations: 미판정 관찰 없음\n")
+        got["skip"] = check(d, 2)
+        os.remove(os.path.join(d, "evidence", "skipped.md"))
+        open(os.path.join(d, "evidence", "open-observations.md"), "w").write("- `src/A.swift:12` `suspend()` 는 pauseAd · pause 둘 다 · `resume()` 은 resumeAd 만\n")
+        got["file"] = check(d, 2)
+        case("f105-open-observations-slot-enforced",
+             got == {"req": (False, False, True, True), "miss": VIOLATION, "skip": OK, "file": OK}, got)
+
+        # F-580 — PR 테스트 기록: 기본 검사(Gather 5.5 · GPT 정문)는 보지 않고 --test-run(Deliver 앞)만 본다 · 판정 불가는 2
+        def tr(name, tier=1, tests=({"path": "Tests/ATests.swift", "suites": ["ATests"]},), review=None, skip=None, risk=True):
+            d = slots(name, tier=tier)
+            if risk is True:
+                json.dump({"risk": 0, "pr_tests": list(tests)}, open(os.path.join(d, "risk.json"), "w"))
+            elif risk is not None:
+                open(os.path.join(d, "risk.json"), "w").write(risk)
+            if review is not None:
+                json.dump(review, open(os.path.join(d, "review.json"), "w"))
+            if skip:
+                open(os.path.join(d, "evidence", "skipped.md"), "w").write(skip)
+            return d
+        got = {"default-gather": check(tr("tr-gather"), 1),
+               "no-review": test_run_check(tr("tr-none"), 1),
+               "no-key": test_run_check(tr("tr-nokey", review={"verdict": "v", "issues": []}), 1),
+               "empty": test_run_check(tr("tr-empty", review={"verdict": "v", "issues": [], "testRun": " "}), 1),
+               "ran": test_run_check(tr("tr-ran", review={"verdict": "v", "issues": [], "testRun": "PR 테스트 — 17건 중 1 실패 · ATests"}), 1),
+               "skipped": test_run_check(tr("tr-skip", skip="- test-run: 앱 타깃 — 어떤 스킴에서도 돌지 않는다\n"), 1),
+               "no-tests": test_run_check(tr("tr-zero", tests=()), 1),
+               "tier0": test_run_check(tr("tr-t0", tier=0), 0),
+               "tier2": test_run_check(tr("tr-t2", tier=2), 2),
+               "risk-missing": test_run_check(tr("tr-norisk", risk=None), 1),
+               "risk-old": test_run_check(tr("tr-oldrisk", risk='{"risk": null, "note": "risk_scan 실패"}'), 1),
+               "risk-old-skipped": test_run_check(tr("tr-oldrisk-skip", risk='{"risk": null, "note": "risk_scan 실패"}',
+                                                     skip="- test-run: risk_scan 이 이 diff 에서 실패 — 테스트 목록을 모른다\n"), 1)}
+        want = {"default-gather": OK, "no-review": VIOLATION, "no-key": VIOLATION, "empty": VIOLATION, "ran": OK, "skipped": OK,
+                "no-tests": OK, "tier0": OK, "tier2": VIOLATION, "risk-missing": UNRUN, "risk-old": UNRUN, "risk-old-skipped": OK}
+        case("f580-test-run-deliver-only", got == want, {k: v for k, v in got.items() if v != want[k]})
+        st = os.path.join(t, "s-testrun")
+        rcs = (run(st, tr("tr-cli-miss"), "--test-run", "--tier", "1")[0],
+               run(st, tr("tr-cli-ok", review={"verdict": "v", "issues": [], "testRun": "PR 테스트 — 통과 3/3"}), "--test-run", "--tier", "1")[0])
+        case("f580-test-run-cli-no-record", rcs == (VIOLATION, OK) and runs(st) == ([], []), (rcs, runs(st)))
     print(f"self-test {passed}/{total} passed")
     return OK if passed == total else 1
 
@@ -553,6 +644,8 @@ def main() -> int:
     ap.add_argument("--third-path", action="store_true",
                     help="리뷰 셋째 검증의 경로를 찍는다 — sc-analyze · fresh-context · undetermined(exit 3 — --skills 없음)")
     ap.add_argument("--skills", help="--third-path 의 입력 — Lead 스킬 목록의 sc: 이름들(쉼표 구분 · sc: 스킬이 없으면 빈 값)")
+    ap.add_argument("--test-run", action="store_true",
+                    help="Deliver 앞 PR 테스트 기록만 본다 — risk.json pr_tests ↔ review.json testRun · skipped test-run(F-580 · 실행 기록 없음)")
     ap.add_argument("--recommended", choices=RECOMMENDS, default="none",
                     help="실행 기록의 추천(mode_gate.py 결과의 recommend — modules/mode-gate.md § 기록) · profile peer-review 만")
     ap.add_argument("--source", choices=SOURCES, help="실행 기록의 선택 출처(modules/mode-gate.md § 기록) · profile peer-review 만")
@@ -569,6 +662,8 @@ def main() -> int:
     if not a.work_dir:
         log("UNRUN: WORK_DIR 인자가 필요하다")
         return UNRUN
+    if a.test_run:
+        return test_run_check(a.work_dir, a.tier)   # Deliver 검사 — 실행 기록을 열지 않는다(시작은 5.5 검사가 이미 남겼다)
     rc = check(a.work_dir, a.tier, profile=a.profile)
     if rc == OK and a.profile == "peer-review":
         record_start(a.work_dir, a.tier if a.tier is not None else tier_file(a.work_dir), a.recommended, a.source)

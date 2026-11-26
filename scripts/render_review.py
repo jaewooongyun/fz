@@ -7,7 +7,7 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
 31.5% — review-report 18.1% · pr-comments 13.4%), 셋이 어긋나도 아무도 모른다. 줄 앵커는 diff_anchors.py 로만 계산한다 —
 인라인 python 으로 다시 짜지 않는다. 게시 규칙의 정본은 `modules/peer-review-inline-anchoring.md` 이고 여기서 옮긴 것은 이렇다.
 
-  payload     top-level body = review-report.md 전문 · 다중 라인은 start_line·start_side·line·side 넷 · 단일 줄은 line·side 만
+  payload     top-level body = review-report.md 전문(큐레이션 리포트의 기존 스레드 대비 독립 발견 절만 뺀다) · 다중 라인은 start_line·start_side·line·side 넷 · 단일 줄은 line·side 만
   구간 선택    겹치는 hunk 가 여럿이면 고르지 않는다 — site 에 pick(diff_anchors 후보 번호, 0부터)이 없으면 거부한다
   앵커 불가    diff 밖 지점은 같은 코멘트 본문에 `path:start-end` 와 함께 인용한다. 인라인 자리가 하나도 없는 이슈는
               body(리포트 전문)에만 남고 미리보기의 reportOnly 에 적힌다
@@ -60,7 +60,11 @@ Lead 는 판정과 문장만 JSON 에 쓴다. 두 문서와 payload 를 따로 �
 
 큐레이션(review 에 `excluded` 키가 있을 때) — 렌더 **전에** scripts/check_comment_worthy.py 의 계약을 돌린다. 위반이면 exit 1 · 판정 불가면 2 ·
   둘 다 파일을 쓰지 않는다. 통과하면 리포트는 ① 이번 PR 버그 ② 구조·품질 제안(non-blocking) ③ 의도 확인 질문 → ④ 참고(E4) → 제외 후보 표 →
-  기존 스레드 대조 줄 → 답글 초안(E5 reply) 순이고, pr-comments.md 끝에 답글 초안을 붙인다(payload 밖 — 기존 스레드 답글은 따로 단다).
+  기존 스레드 대조 줄 → 기존 스레드 대비 독립 발견 표 → 답글 초안(E5 reply) 순이고, pr-comments.md 끝에 답글 초안을 붙인다(payload 밖 — 기존 스레드 답글은 따로 단다).
+  독립 발견 표(F-643): review.json 폴더의 existing-threads.json(status ok) diff 줄 스레드(첫 코멘트 · line 이 없으면 original_line)마다
+  merged-prethread.json(review_merge.py 가 스레드를 읽기 전 첫 병합본으로 고정)의 같은 path ±3줄 후보를 찾아 `사전 후보 id | 관찰 id | 없음`
+  (관찰 = observation 표시 후보 · Lead 가 후보 전에 기각한 것)과 집계 줄을 그린다. 스레드 0개 · 스레드를 못 읽음이면 절이 없다 ·
+  병합본이 없거나 읽지 못하면 '셀 수 없음' 한 줄이다(없음 행으로 그리지 않는다). 이 절은 리포트에만 있고 payload.body 에서는 빠진다(내부 측정 — 게시하지 않는다)
   추가 키: target{kind, ref, sha}(gather 의 target.json) · candidates(후보 원본 상대 경로) · issue.kind · evidence · repro · measure · refute · covers ·
   distinctFrom · premiseCheck · citeExpect · gptPass(independent · challenger · none) · excluded[{id, what, code E1~E8, reason, covers?, duplicateOf?, reply?, refute?}] — 계약 정본은 check_comment_worthy.py 머리말
   --self-test
@@ -71,6 +75,7 @@ exit: 0=렌더 · 1=거부(구간 선택 필요 · 후보 밖 pick · body 상�
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
@@ -94,6 +99,7 @@ AXES = ("code_quality", "structure", "correctness", "runtime_safety", "direction
 LANG_MIN = 0.3                            # --lang ko — 한글 / (한글 + 라틴 글자). 식별자를 백틱 없이 섞어도 넘고, 영어 산문은 0 근처다
 INDEX_BEGIN, INDEX_END = "<!-- fz-render:begin -->", "<!-- fz-render:end -->"
 STATUS_KO = {"finding": "발견", "found": "발견", "gap": "판정 안 함", "none": "위반 없음", "not_applicable": "해당 없음"}   # Claude · GPT 두 어휘(F-559)
+PRETHREAD = "merged-prethread.json"       # review_merge.py 가 --out merged.json 옆에 고정한 첫 병합본 — 스레드를 읽기 전 판(F-643)
 
 
 class InputError(Exception):
@@ -394,7 +400,7 @@ def _cell(v) -> str:
     return str(v or "—").replace("|", "\\|").replace("\n", " ").strip()
 
 
-def curated_report(r: dict, plans: list, info: dict, cost: dict | None = None) -> str:
+def curated_report(r: dict, plans: list, info: dict, cost: dict | None = None, posted: bool = False) -> str:
     pr = r.get("pr") or {}
     lines = [f"# PR #{pr['number']} 리뷰" if pr.get("number") is not None else "# 리뷰 보고서", "",
              f"**판정**: {r['verdict'].strip()}", ""]
@@ -439,6 +445,8 @@ def curated_report(r: dict, plans: list, info: dict, cost: dict | None = None) -
     lines += [f"| `{x['id']}` | {_cell(x.get('what'))} | {x.get('code')} | {_cell(x.get('reason'))}"
               + (f" (+{len(x['covers'])} 묶음)" if x.get("covers") else "") + " |" for x in ex]
     lines += ["", "## 기존 스레드 대조", "", info.get("thread_line") or "—", ""]
+    if not posted:   # ⛔ 독립 발견 표는 fz 내부 측정이다 — 리포트(로컬)에만 두고 게시 body 에는 싣지 않는다(F-643 · 답글 초안과 같은 규칙)
+        lines += prethread_lines(info)
     if info.get("symbol_check"):   # 제안 코드 식별자를 대조하지 못했다 — 검증 통과로 읽히지 않게 리포트에 남긴다(F-063 리뷰)
         lines += ["## 제안 식별자 대조", "", info["symbol_check"], ""]
     replies = [x for x in ex if x.get("code") == "E5" and str(x.get("reply") or "").strip()]
@@ -448,6 +456,67 @@ def curated_report(r: dict, plans: list, info: dict, cost: dict | None = None) -
         lines += ["## Severity 보정 근거", "", r["severityNote"].strip(), ""]
     lines += strength_lines(r) + judgment_lines(r) + axes_lines(r, plans) + cost_lines(cost, r.get("costLog"))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def prethread_info(base: Path, ccw, diff: Path | None = None) -> dict | None:
+    """'기존 스레드 대비 독립 발견' 재료(F-643) — diff 줄 스레드(첫 코멘트 · 답글은 같은 스레드)마다 스레드를 읽기 전 첫 병합본
+    (review_merge.py 가 고정한 merged-prethread.json)에 같은 path ±NEAR 줄 후보 · 관찰이 있었나. 스레드를 못 읽었거나 diff 줄 스레드가
+    0개면 None(절 없음). 병합본이 없거나 읽지 못하면 rows None + 사유 — ⛔ '없음' 행으로 그리지 않는다(셀 수 없음 ≠ 독립으로 못 봄)."""
+    import review_merge   # 줄 범위 의미(spans)는 병합기 한 곳에 둔다 — run_render 가 scripts 폴더를 sys.path 에 넣었다
+    threads, _ = ccw.threads_of(base)
+    roots = []
+    for c in threads or []:
+        ln = c.get("line") if is_int(c.get("line")) else c.get("original_line")   # 밀린 줄은 line 이 비고 original_line 이 남는다
+        if not c.get("in_reply_to_id") and isinstance(c.get("path"), str) and c["path"] and is_int(ln):
+            roots.append({"id": c.get("id"), "path": c["path"], "line": ln})
+    if not roots:
+        return None
+    pt = {"threads": len(roots), "near": ccw.NEAR, "rows": None, "why": None}
+    try:
+        doc = json.loads((base / PRETHREAD).read_text(encoding="utf-8"))
+        cands = doc.get("candidates") if isinstance(doc, dict) else None
+        if not isinstance(cands, list) or not all(isinstance(c, dict) for c in cands):
+            raise ValueError("candidates[] 가 객체 배열이 아니다")
+        pin_sha = (doc.get("prethread") or {}).get("diffSha256") if isinstance(doc.get("prethread"), dict) else None
+        if diff is not None:   # 같은 작업 폴더를 다른 diff 에 다시 쓰면 옛 고정본이 남는다 — 지금 diff 의 병합본일 때만 센다(GPT 리뷰 P2)
+            now = {hashlib.sha256(f.read_bytes()).hexdigest() for f in (diff, base / "review-surface.patch") if f.is_file()}
+            if not pin_sha:
+                return dict(pt, why=f"{PRETHREAD} 에 diff 지문(prethread.diffSha256)이 없다 — 병합기가 고정한 판이 아니다")
+            if pin_sha not in now:
+                return dict(pt, why=f"{PRETHREAD} 는 다른 diff 의 병합본이다(지문 {pin_sha[:12]} ≠ 지금 diff) — 같은 폴더를 다른 diff 에 다시 썼다")
+    except FileNotFoundError:
+        return dict(pt, why=f"{PRETHREAD} 없음 — 스레드를 읽기 전 병합본이 없는 경로다(병합 없이 Curate · 병합 출력이 merged.json 이 아님)")
+    except (OSError, ValueError) as e:
+        return dict(pt, why=f"{PRETHREAD} 를 읽지 못했다({type(e).__name__})")
+    rows = []
+    for t in roots:
+        hit = [c for c in cands if c.get("file") == t["path"]
+               and any(a - pt["near"] <= t["line"] <= b + pt["near"] for a, b in review_merge.spans(c.get("line_range")))]
+        rows.append(dict(t, candidates=[str(c.get("id")) for c in hit if not c.get("observation")],
+                         observations=[str(c.get("id")) for c in hit if c.get("observation")]))
+    return dict(pt, rows=rows)
+
+
+def prethread_lines(info: dict) -> list:
+    """`## 기존 스레드 대비 독립 발견` — 스레드 id → 사전 후보 id | 관찰 id | 없음(F-643 · 외부 리뷰어 스레드 대비 독립 커버리지)."""
+    pt = info.get("prethread")
+    if not pt:
+        return []
+    out = ["## 기존 스레드 대비 독립 발견", ""]
+    if pt["rows"] is None:
+        return out + [f"셀 수 없음 — {pt['why']} · diff 줄 스레드 {pt['threads']}개", ""]
+    n = {"후보": 0, "관찰": 0, "없음": 0}
+    rows = []
+    for r in pt["rows"]:
+        cell = [f"사전 후보 {', '.join(f'`{i}`' for i in r['candidates'])}"] if r["candidates"] else []
+        cell += [f"관찰 {', '.join(f'`{i}`' for i in r['observations'])}"] if r["observations"] else []
+        n["후보" if r["candidates"] else "관찰" if r["observations"] else "없음"] += 1
+        where = _cell(f"`{r['path']}:{r['line']}`")
+        rows.append(f"| {_cell(r['id'])} | {where} | {' · '.join(cell) or '없음'} |")
+    return out + [f"스레드를 읽기 전 첫 병합본(`{PRETHREAD}`)에 같은 path ±{pt['near']}줄 후보 · 관찰이 있었는지다 — "
+                  "없음은 fz 가 그 자리를 스레드보다 먼저 보지 못했다는 뜻이다.", "",
+                  f"diff 줄 스레드 {len(rows)}개 — 사전 후보 {n['후보']} · 관찰만 {n['관찰']} · 없음 {n['없음']}", "",
+                  "| 스레드 | 위치 | 사전 판 |", "|---|---|---|", *rows, ""]
 
 
 def check_posted_lines(us: list, texts: dict) -> None:
@@ -504,6 +573,7 @@ def render(review, diff_text: str, curation: dict | None = None, cost: dict | No
     plans.sort(key=lambda p: SEVERITIES.index(p["issue"]["severity"]))   # 안정 정렬 — 같은 severity 는 JSON 순서
     us = [u for p in plans for u in units(p["issue"], p["sites"])]
     rep = curated_report(review, plans, curation or {}, cost) if "excluded" in review else report(review, plans, cost)
+    body = curated_report(review, plans, curation or {}, cost, posted=True) if "excluded" in review else rep
     comments, rows = inline(us)
     pr = review.get("pr") or {}
     if pr.get("headSha"):
@@ -511,9 +581,9 @@ def render(review, diff_text: str, curation: dict | None = None, cost: dict | No
     event = review.get("event", "COMMENT")
     payload = None
     if pr.get("headSha"):
-        if len(rep) > BODY_LIMIT:
-            raise Reject(f"body {len(rep):,}자 > {BODY_LIMIT:,}자 — Matrix 만 남기고 이슈 상세를 인라인에 맡겨야 한다(앵커 모듈 §4)")
-        payload = {"commit_id": pr["headSha"], "event": event, "body": rep, "comments": comments}
+        if len(body) > BODY_LIMIT:
+            raise Reject(f"body {len(body):,}자 > {BODY_LIMIT:,}자 — Matrix 만 남기고 이슈 상세를 인라인에 맡겨야 한다(앵커 모듈 §4)")
+        payload = {"commit_id": pr["headSha"], "event": event, "body": body, "comments": comments}
     na = [{"id": p["issue"]["id"], "loc": x["loc"], "side": x["site"].get("side", "RIGHT"), "reason": x["na"]["reason"]}
           for p in plans for x in p["sites"] if not x["cands"]]
     picked = [{"id": u["id"], "loc": u["at"]["loc"], "pick": u["at"]["site"].get("pick", 0),
@@ -571,6 +641,10 @@ def run_render(a) -> int:
         if code:
             return fail(REJECT if code == ccw.VIOLATION else UNRUN,
                         ("REJECT" if code == ccw.VIOLATION else "UNRUN") + ": 코멘트 가치 검사 — " + " · ".join(bad[:5]))
+        try:
+            curation["prethread"] = prethread_info(Path(a.review).resolve().parent, ccw, Path(a.diff))
+        except Exception as e:   # noqa: BLE001 — 실패도 fail() 로 — 이전 실행의 산출물이 지금 리뷰로 남지 않게
+            return fail(UNRUN, f"UNRUN: 기존 스레드 대비 독립 발견 계산 예외 — {type(e).__name__}: {e}")
     want = getattr(a, "head_sha", None)
     if want is not None:          # ⛔ 넘긴 빈 값(`"$(gh pr view …)"` 조회 실패)은 생략이 아니다 — 대조를 건너뛰면 아무 head 에나 게시된다
         want = want.strip()
@@ -1247,8 +1321,80 @@ def self_test() -> int:
         case("f063-unverified-symbols-in-report — 대조 못 한 제안 식별자는 리포트에 미검증으로 남는다",
              "## 제안 식별자 대조" in unv and "미검증" in unv and "제안 식별자 대조" not in ok_, unv[-200:])
 
+    def t_prethread():
+        # F-643 — 스레드를 읽기 전 첫 병합본(review_merge.py 가 merged.json 옆에 고정) × existing-threads.json
+        ex = tmp / "pre"
+        subprocess.run([sys.executable, __file__, "--example-curated-dir", str(ex)], capture_output=True, text=True)
+        pdir = tmp / "pre-merge"
+        pdir.mkdir()
+        (pdir / "lead.json").write_text(json.dumps({
+            "issues": [{"id": "C1", "severity": "minor", "file": "src/b.swift", "line_range": "2", "discoveryAxis": "correctness",
+                        "title": "t", "evidence": "`k2`"}],
+            "observations": [{"id": "O1", "file": "a.swift", "line_range": "33", "what": "33행 경계 값", "reason": "도달 경로 없음"}]},
+            ensure_ascii=False), encoding="utf-8")
+        m = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "review_merge.py"), "--claude", str(pdir / "lead.json"),
+                            "--diff", str(diff), "--gpt-unavailable", "시험", "--out", str(pdir / "merged.json")], capture_output=True, text=True)
+        pin = (pdir / PRETHREAD).read_bytes() if (pdir / PRETHREAD).is_file() else b""
+        th = {"status": "ok", "reviews": [], "comments": [
+            {"id": 104, "path": "src/b.swift", "line": 2, "in_reply_to_id": None},
+            {"id": 102, "path": "src/a.swift", "line": None, "original_line": 33, "in_reply_to_id": None},
+            {"id": 103, "path": "src/a.swift", "line": 33, "in_reply_to_id": 102},
+            {"id": 105, "path": "src/a.swift", "line": 40, "in_reply_to_id": None}]}
+
+        def rend(name, threads, pinned, review="review.json"):
+            (ex / "existing-threads.json").unlink(missing_ok=True)
+            (ex / PRETHREAD).unlink(missing_ok=True)
+            if threads is not None:
+                (ex / "existing-threads.json").write_text(json.dumps(threads, ensure_ascii=False), encoding="utf-8")
+            if pinned is not None:
+                (ex / PRETHREAD).write_bytes(pinned)
+            r = subprocess.run([sys.executable, __file__, "--review", str(ex / review), "--diff", str(diff), "--out-dir", str(tmp / name),
+                                "--require-curation"], capture_output=True, text=True)
+            return r, (tmp / name / "review-report.md").read_text(encoding="utf-8") if r.returncode == 0 else ""
+        r, rep = rend("pre-ok", th, pin)
+        case("f643-prethread-table — 스레드마다 사전 후보 id | 관찰 id | 없음(병합기가 고정한 merged-prethread.json) · 답글은 행이 아니다 · "
+             "line 이 없으면 original_line · 집계 줄 · 기존 스레드 대조 뒤",
+             m.returncode == 0 and r.returncode == 0 and "diff 줄 스레드 3개 — 사전 후보 1 · 관찰만 1 · 없음 1" in rep
+             and "| 104 | `src/b.swift:2` | 사전 후보 `claude:C1` |" in rep and "| 102 | `src/a.swift:33` | 관찰 `claude:O1` |" in rep
+             and "| 105 | `src/a.swift:40` | 없음 |" in rep and "| 103 |" not in rep
+             and rep.find("## 기존 스레드 대조") < rep.find("## 기존 스레드 대비 독립 발견"), (m.returncode, m.stderr[-200:], r.returncode, r.stderr[-200:], rep[-600:]))
+        pay = json.loads((tmp / "pre-ok" / "payload.json").read_text(encoding="utf-8")) if r.returncode == 0 else {"body": "## 기존 스레드 대비"}
+        case("f643-prethread-not-posted — 독립 발견 절은 리포트에만 있고 payload.body 에는 없다(내부 측정 · 나머지 본문은 같다)",
+             "## 기존 스레드 대비 독립 발견" in rep and "## 기존 스레드 대비" not in pay["body"]
+             and pay["body"].split("## 기존 스레드 대조")[0] == rep.split("## 기존 스레드 대조")[0], pay["body"][-300:])
+        quiet = [rend("pre-zero", {"status": "ok", "reviews": [], "comments": [], "conversation": [{"author": "x", "body": "대화"}]}, pin),
+                 rend("pre-reply-only", {"status": "ok", "reviews": [], "comments": [th["comments"][2]]}, pin),
+                 rend("pre-unavailable", {"status": "unavailable", "reason": "gh 실패", "comments": []}, pin), rend("pre-no-file", None, pin)]
+        case("f643-prethread-no-threads-no-section — diff 줄 스레드 0개(빈 목록 · 대화 · 답글뿐) · 스레드를 못 읽음 · 파일 없음이면 절이 없다",
+             all(q.returncode == 0 and "## 기존 스레드 대비" not in t for q, t in quiet), [(q.returncode, q.stderr[-120:]) for q, _ in quiet])
+        stale = json.loads(pin.decode() or "{}") if pin else {}
+        other = json.dumps(dict(stale, prethread={"diffSha256": "0" * 64}), ensure_ascii=False).encode()
+        nometa = json.dumps({k: v for k, v in stale.items() if k != "prethread"}, ensure_ascii=False).encode()
+        (ro, repo_), (rn, repn) = rend("pre-other-diff", th, other), rend("pre-no-meta", th, nometa)
+        case("f643-prethread-diff-bound — 고정본이 다른 diff 의 병합본이거나 지문이 없으면 '셀 수 없음'(옛 후보를 독립 발견으로 세지 않는다)",
+             ro.returncode == rn.returncode == 0 and "다른 diff 의 병합본이다" in repo_ and "diff 지문(prethread.diffSha256)이 없다" in repn
+             and "| 104 |" not in repo_ + repn, ([l for l in repo_.splitlines() if "셀 수 없음" in l], [l for l in repn.splitlines() if "셀 수 없음" in l]))
+        (rm, repm), (rb, repb) = rend("pre-missing", th, None), rend("pre-broken", th, b"{")
+        case("f643-prethread-missing-not-none — 고정본이 없거나 읽지 못하면 '셀 수 없음' 한 줄 · 없음 행으로 그리지 않는다",
+             rm.returncode == rb.returncode == 0 and f"셀 수 없음 — {PRETHREAD} 없음" in repm and f"셀 수 없음 — {PRETHREAD} 를 읽지 못했다" in repb
+             and "diff 줄 스레드 3개" in repm and "| 105 |" not in repm + repb and "| 없음 |" not in repm + repb, (repm[-300:], repb[-300:]))
+        # 병합본의 관찰 후보 — Curate 커버리지가 제외 표로 끌어올린다(처분하지 않으면 렌더가 파일 없이 멈춘다)
+        merged = json.loads((pdir / "merged.json").read_text(encoding="utf-8")) if m.returncode == 0 else {"candidates": []}
+        o1 = next((c for c in merged["candidates"] if c["id"] == "claude:O1"), {"id": "claude:O1"})
+        exm = json.loads((ex / "merged.json").read_text(encoding="utf-8"))
+        exm["candidates"].append(o1)
+        (ex / "merged.json").write_text(json.dumps(exm, ensure_ascii=False), encoding="utf-8")
+        lost = rend("pre-obs-lost", None, None)[0]
+        rv = json.loads((ex / "review.json").read_text(encoding="utf-8"))
+        rv["excluded"].append({"id": "claude:O1", "what": o1.get("title"), "code": "E1", "reason": o1.get("disposition_reason")})
+        (ex / "obs.json").write_text(json.dumps(rv, ensure_ascii=False), encoding="utf-8")
+        ok, rep = rend("pre-obs-ok", None, None, review="obs.json")
+        case("f643-observation-in-excluded-table — 병합본의 관찰을 처분하지 않으면 렌더 거부(exit 1 · 파일 0) · excluded 로 두면 제외 표에 사유와 함께",
+             lost.returncode == 1 and "claude:O1" in lost.stderr and files_in("pre-obs-lost") == [] and ok.returncode == 0
+             and "## 제외 후보 3건" in rep and "| `claude:O1` | 33행 경계 값 | E1 | 도달 경로 없음 |" in rep, (lost.returncode, lost.stderr[-200:], ok.stderr[-200:]))
+
     tests = [t_ids, t_anchor, t_lines, t_body, t_na, t_pick, t_event, t_split, t_carry, t_nodiff, t_empty, t_nopr, t_det, t_limit, t_cli,
-             t_example, t_curated, t_s8, t_round2, t_judgment, t_synth_sync]
+             t_example, t_curated, t_s8, t_round2, t_judgment, t_synth_sync, t_prethread]
     try:
         for t in tests:
             try:

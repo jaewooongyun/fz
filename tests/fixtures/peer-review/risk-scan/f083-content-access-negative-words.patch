@@ -1,0 +1,13 @@
+diff --git a/src/Updater.swift b/src/Updater.swift
+index 1111111..2222222 100644
+--- a/src/Updater.swift
++++ b/src/Updater.swift
+@@ -1,3 +1,9 @@
+ final class Updater {
++    let usage = manager.usage(for: userAgent)
++    func forceUpgrade() { downgradeIfNeeded(); iterating = false }
++    let blur = UIBlurEffect(style: .dark)
++    var isBlinded = false
++    let AGENT_ID = "x"; let image = message.image
++    func generating() { storage.percentage = 0 }
+ }
