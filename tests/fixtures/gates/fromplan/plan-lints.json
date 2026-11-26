@@ -22,6 +22,10 @@
     { "id": "L7", "title": "[기본 off] 새 옵션", "files": ["config.json"],
       "verify": { "kind": "command", "criterion": "기본 off 를 지킨다",
                   "command": "R=\"${FZ_IMPL_ROOT:?}\" && ! grep -q newopt \"$R/config.json\" && echo L7_OK", "expect": "L7_OK" } },
+    { "id": "L8", "title": "errexit 아래 부정 단언", "files": ["n"],
+      "verify": { "kind": "command", "criterion": "bad 가 없다", "command": "set -e; ! grep -q bad notes.txt; echo L8_OK", "expect": "L8_OK" } },
+    { "id": "L9", "title": "errexit 아래 부정 단언", "files": ["n"],
+      "verify": { "kind": "command", "criterion": "bad 가 없다", "command": "set -e; test -n x; ! grep -q bad notes.txt && echo L9_OK", "expect": "L9_OK" } },
     { "id": "M1", "title": "사유 없는 수동", "verify": { "kind": "manual", "criterion": "사람이 화면을 본다" } },
     { "id": "M2", "title": "사유 있는 수동", "verify": { "kind": "manual", "criterion": "사용자 결정 — 배포 시점을 사람이 고른다" } }
   ],

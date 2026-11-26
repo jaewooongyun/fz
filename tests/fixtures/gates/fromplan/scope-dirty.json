@@ -1,0 +1,18 @@
+{
+  "title": "writeScope 기준선",
+  "steps": [
+    {
+      "id": "W1",
+      "title": "대상 수정",
+      "files": [
+        "scope_target.py"
+      ],
+      "verify": {
+        "kind": "command",
+        "criterion": "a 가 돈다",
+        "command": "python3 scope_target.py && echo W1_OK",
+        "expect": "W1_OK"
+      }
+    }
+  ]
+}

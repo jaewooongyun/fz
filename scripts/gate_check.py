@@ -604,7 +604,26 @@ def env_fingerprint() -> str:
     | 승인 도장 | 사람·GPT 가 승인한 oracle | ⛔ 제외 |
     | 증거 서명 | 이 결과가 **어느 환경에서** 나왔나 | ✅ 포함 |
     """
-    return sha(f"{os.environ.get('SHELL', '/bin/sh')}|{path_fingerprint()}")[:HASH_LEN]
+    return sha(f"{os.environ.get('SHELL', '/bin/sh')}|{path_fingerprint()}|claude={cli_version()}")[:HASH_LEN]
+
+
+_CLI_CACHE: dict = {}
+
+
+def cli_version() -> str:
+    """`claude --version` 첫 줄(없으면 `none` · 못 읽으면 `?`) — 증거 지문에 묶는다(F-629).
+    health-check 가 CLI 로 재는 항목(plugin validate · plugin test)은 CLI 판이 바뀌면 같은 트리에서도 결과가 바뀐다 — 판이 지문에
+    없으면 기준선과 끝 검증의 차이를 트리 탓으로 읽는다. 지문은 증거에 기록된 값으로 재계산하므로 이미 찍힌 증거는 그대로다.
+    PATH 마다 한 번만 부른다."""
+    key = os.environ.get("PATH", "")
+    if key not in _CLI_CACHE:
+        exe = shutil.which("claude")
+        try:
+            r = subprocess.run([exe, "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10) if exe else None
+            _CLI_CACHE[key] = "none" if r is None else ((r.stdout or "").strip().splitlines() or ["?"])[0][:60]
+        except (OSError, subprocess.SubprocessError):
+            _CLI_CACHE[key] = "?"
+    return _CLI_CACHE[key]
 
 
 def oracle_hash(gate: Gate, cwd: str) -> str:
@@ -836,6 +855,24 @@ def timeout_total(ledger, only=None) -> float:
 
 SHELL_ERR_RE = re.compile(r"^[^\n]*: [Ii]s a directory[ \t]*$", re.M)
 CMD_MISSING_RE = re.compile(r"^[^\n]*: (?:command )?not found[ \t]*$", re.M)
+
+
+# F-656 — 기준선(RED)에서 '명령이 깨진 실패' 로 칠 수 있는 꼴은 셸이 직접 낸 두 오류뿐이다. 경로 없는 이름의 명령 부재(설치 · 오타)와
+#    변수 미설정(`${X:?}` · set -u). 경로를 가진 대상의 부재(`bash scripts/new.sh` · `./new_tool` — 아직 만들지 않은 산출물)는 의도한 RED 이고,
+#    CHECK 가 스스로 찍은 `…: not found` 줄은 셸 접두가 없어 걸리지 않는다
+_SH_PREFIX = r"(?:/(?:usr/)?bin/)?(?:ba|da|z|k)?sh:(?:[ \t]*\d+:)?[ \t]*(?:line \d+:[ \t]*)?"
+BROKEN_CMD_RE = re.compile(rf"^{_SH_PREFIX}(?:([^\s/:]+): (?:command )?not found|command not found: ([^\s/]+))[ \t]*$", re.M)
+PARAM_UNSET_RE = re.compile(rf"^{_SH_PREFIX}([A-Za-z_][A-Za-z0-9_]*): (?:parameter (?:null or )?not set|unbound variable)[ \t]*$", re.M)
+
+
+def broken_command(result) -> str:
+    """기준선 FAIL 이 RED 증명이 아니라 명령이 깨져서 난 것인가 — 사유 한 줄, 아니면 빈 문자열(F-656)."""
+    out = result.output or ""
+    m = BROKEN_CMD_RE.search(out)
+    if m:
+        return "command-not-found:" + (m.group(1) or m.group(2))
+    m = PARAM_UNSET_RE.search(out)
+    return "param-unset:" + m.group(1) if m else ""
 
 
 def shell_trace(result) -> str:
@@ -1270,6 +1307,15 @@ def evaluate(ledger: Ledger, mode: str, budget_s: float, only=None) -> int:
         if missing:
             raise InfraError(f"--only 에 없는 게이트 id: {', '.join(sorted(missing))}")
         targets = [g for g in ledger.gates if g.id in wanted]
+        # F-747 — `--only` 는 지목한 게이트의 도장만 본다. 확정 뒤 다른 게이트의 문구를 고쳐 도장이 어긋나도
+        #    단계 게이트만 돌리는 흐름에서는 출하 직전 상태 전이까지 드러나지 않았다 — 막지 않고 순서 전체를 알린다
+        for g in ledger.gates:
+            declared = g.attrs.get("APPROVED_ORACLE_HASH")
+            if g.id in wanted or not g.is_runnable or declared is None:
+                continue
+            if declared != oracle_hash(g, resolve_cwd(g, ledger)):
+                print(f"  ⚠️  {g.id}: --only 밖 게이트의 APPROVED_ORACLE_HASH 불일치 — 승인 뒤 계약 문구가 바뀌었다. "
+                      f"재승인 `--finalize --only {g.id}` 뒤 `--only {g.id}` 재실행(F-747)")
 
     for gate in targets:
         state = gate_state(gate, ledger)
@@ -1624,6 +1670,15 @@ def self_test() -> int:
                 (sandbox / rel).write_text(text, encoding="utf-8")
             before = ledger_path.read_text(encoding="utf-8") if ledger_path.exists() else None
 
+            if case.get("git_repo"):
+                # F-637 — 구현 트리를 git 저장소로 만들고 커밋한 뒤 `dirty` 파일을 고친다(사용자 훅이 끼지 않게 hooksPath 를 끈다)
+                repo = sandbox / case["git_repo"]
+                git = ["git", "-C", str(repo), "-c", "core.hooksPath=/dev/null", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+                for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-qm", "base"]):
+                    subprocess.run(git + cmd, check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=30)
+                for rel in case.get("dirty") or []:
+                    with open(repo / rel, "a", encoding="utf-8") as fh:
+                        fh.write("# changed\n")
             if case.get("mode") == "from-plan":
                 # 변환 케이스 — 입력은 plan JSON 이고 산출물은 새 원장이다.
                 out = sandbox / "fromplan" / "generated.md"
@@ -1857,7 +1912,7 @@ def pin_of(verify: dict, gid: str, envs: list) -> list:
 VERIFY_KEYS = frozenset(("kind", "criterion", "command", "expect", "cwd", "tools", "env", "timeout", "side_effects", "pin"))
 
 
-def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "") -> str:
+def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "", release_procedure: str = "") -> str:
     """plan 의 steps[] 를 원장 Markdown 으로 변환한다.
 
     ⛔ 산문 절차가 아니라 스크립트인 이유: 변환이 결정론적이고, 산문으로 두면
@@ -1872,6 +1927,9 @@ def render_ledger(steps, root: str, scope: str, title: str, impl_root: str = "")
         lines.insert(2, f"IMPL_ROOT: {impl_root}")
     if scope:
         lines.append(f"Scope: {scope}")
+    # F-760 — 판 끝 절차(배출 · 이동 · 버전 올림)가 CHECK 대상을 바꾸면 verify-gates 가 post_procedure 를 판정하게 머리로 남긴다
+    if release_procedure:
+        lines.append(f"RELEASE_PROCEDURE: {release_procedure}")
     lines.append("")
 
     demoted = []
@@ -2023,6 +2081,22 @@ def _unguarded(cmd: str) -> list:
     return out
 
 
+def _negated_inert(cmd: str) -> list:
+    """`set -e` 아래 마지막이 아닌 조각의 부정 명령(`! cmd`) — errexit 는 부정한 파이프라인의 실패를 무시하므로
+    단언처럼 보여도 거짓이면 그냥 다음으로 간다(F-731). 마지막 조각은 셸의 종료 코드가 되므로 뺀다."""
+    if not re.search(r"(?:^|[\s;&])set\s+-[a-z]*e", cmd):
+        return []
+    out = []
+    for seg in _segments(cmd)[:-1]:
+        s = seg.strip()
+        m = CHAIN_BODY.match(s)
+        if m:
+            s = s[m.end():]
+        if re.match(r"!\s", s) or re.search(r"(?:&&|\|\|)\s*!\s", s):
+            out.append(s)
+    return out
+
+
 def _bare_backtick(cmd: str) -> bool:
     """작은따옴표 밖의 이스케이프 안 된 백틱이 있는가(F-229) — 셸이 명령 치환으로 돌린다."""
     quote, i = None, 0
@@ -2064,7 +2138,7 @@ def _old_checks(text: str) -> dict:
     return out
 
 
-def plan_lints(steps, rtm, old_checks: dict) -> list:
+def plan_lints(steps, rtm, old_checks: dict, release_procedure: str = "") -> list:
     """원장 생성 때의 경고 — 차단하지 않는다. 사람이 읽는 제목 · 기준과 기계가 도는 command 의 어긋남을 드러낸다.
 
     ⛔ 경고만 하는 이유: 토큰이 command 밖에서 재지는 정당한 경우(fixture 안 단언)를 가를 수 없다.
@@ -2116,6 +2190,9 @@ def plan_lints(steps, rtm, old_checks: dict) -> list:
         if _bare_backtick(cmd):
             warns.append(f"⚠️  {gid}: command 에 이스케이프 안 된 백틱 — 셸이 명령 치환으로 돌려 다른 것을 잰다"
                          "(정규식이면 \\` 또는 작은따옴표 · F-229)")
+        for seg in _negated_inert(cmd):
+            warns.append(f"⚠️  {gid}: set -e 아래 `{seg[:48]}` 는 실패해도 멈추지 않는다 — errexit 는 부정 명령을 보지 않는다"
+                         "(`! cmd || exit 1` 또는 `if cmd; then exit 1; fi` · F-731)")
         for seg in _unguarded(cmd):
             warns.append(f"⚠️  {gid}: ; 로 이은 앞 명령 `{seg[:48]}` 에 || exit 가 없다 — 실패해도 다음 명령이 돈다(F-295)")
         # F-296 — 읽는 WORK_DIR 산출물을 만드는 Step 이 앞에 없다
@@ -2129,6 +2206,13 @@ def plan_lints(steps, rtm, old_checks: dict) -> list:
         if "기본 off" in title + crit and ABSENCE_GREP.search(cmd):
             warns.append(f"⚠️  {gid}: [기본 off] 인데 command 가 작업 트리 부재를 단언한다(! grep … \"$R/…\") — "
                          "기본 off 는 트리 상태가 아니라 설정 기본값으로 잰다(F-341)")
+    # F-760 — 계획이 레지스트리 · 판 상태를 바꾸는데 판 끝 절차 머리가 없으면 절대값 · 스냅숏 CHECK 가 계획 자신의 처분 뒤 깨진다
+    if not release_procedure:
+        hits = sorted({m.group(0) for s in steps if isinstance(s, dict)
+                       for m in STATE_MUTATING.finditer(json.dumps(s, ensure_ascii=False))})
+        if hits:
+            warns.append(f"⚠️  원장: 계획이 상태를 바꾼다({' · '.join(hits[:4])}) 그런데 releaseProcedure 가 없다 — "
+                         "verify-gates 의 post_procedure 축이 전부 n/a 로 지나간다. steps.json 에 releaseProcedure 한 줄(F-760)")
     # F-238 — RTM 요구가 어느 Step 에도 매핑되지 않았다
     if isinstance(rtm, list):
         mapped = {}
@@ -2148,6 +2232,10 @@ def plan_lints(steps, rtm, old_checks: dict) -> list:
             if not hit:
                 warns.append(f"⚠️  RTM: 요구 {req} 가 어느 Step 에도 매핑되지 않았다 — stepId 가 steps[] 밖이다(F-238)")
     return warns
+
+
+# F-760 — 레지스트리 처분 · 배출 · 판 올림처럼 CHECK 가 재는 대상을 계획 스스로 바꾸는 표지
+STATE_MUTATING = re.compile(r"--dispose\b|--new-entry\b|--eject\b|\.archive/|APPLIED\.md|plugin\.json|marketplace\.json")
 
 
 # F-576 — stepId 문자열("S1,S2")을 형제 도구와 같은 구분자로 나눈다(plan_divergence.STEP_SPLIT · plan_integrity_check 와 같은 표기)
@@ -2260,6 +2348,21 @@ def criterion_drift(ledger: Ledger, phrases_path: str) -> int:
     return EXIT_UNMET if hits else EXIT_OK
 
 
+def _dirty_scope(steps, repo: str):
+    """F-637 — 계획 writeScope(steps[].files) 가운데 구현 트리에서 이미 바뀐(커밋 안 된) 파일 목록. git 상태를 못 읽으면 None."""
+    files = sorted({_norm_file(f) for st in steps if isinstance(st, dict) for f in (st.get("files") or []) if _norm_file(f)})
+    if not files:
+        return []
+    try:
+        r = subprocess.run(["git", "-C", repo, "status", "--porcelain", "--untracked-files=no", "--", *files],
+                           capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return [ln[3:] for ln in r.stdout.splitlines() if ln.strip()]
+
+
 def from_plan(plan_path: Path, root: str, out: Path, impl_root: str = "") -> int:
     try:
         data = json.loads(plan_path.read_text(encoding="utf-8"))
@@ -2283,7 +2386,8 @@ def from_plan(plan_path: Path, root: str, out: Path, impl_root: str = "") -> int
 
     text = render_ledger(steps, root_real,
                          str(data.get("scope", "")).strip(),
-                         str(data.get("title", "")).strip() or out.stem, impl_real)
+                         str(data.get("title", "")).strip() or out.stem, impl_real,
+                         str(data.get("releaseProcedure", "")).strip())
     try:
         old_text = out.read_text(encoding="utf-8") if out.is_file() else ""
     except OSError:
@@ -2295,8 +2399,15 @@ def from_plan(plan_path: Path, root: str, out: Path, impl_root: str = "") -> int
     #    "만들었다"가 아니라 파서가 판정한다.
     load(out)
     print(f"원장 생성: {out} (게이트 {len(steps)}개)")
-    for w in plan_lints(steps, data.get("rtm"), _old_checks(old_text)):
+    for w in plan_lints(steps, data.get("rtm"), _old_checks(old_text), str(data.get("releaseProcedure", "")).strip()):
         print(w)
+    if impl_real:
+        dirty = _dirty_scope(steps, impl_real)
+        if dirty is None:
+            print("  NOTE: writeScope 의 변경 여부를 재지 못했다 — --impl-root 의 git 상태를 읽지 못함(F-637 · 통과 아님)")
+        elif dirty:
+            print(f"⚠️  원장: writeScope 파일 {len(dirty)}개가 이미 바뀌었다({' · '.join(dirty[:4])}) — 이 트리의 기준선은 구현 전이 아니다. "
+                  "편집은 별도 patch 로 미루거나 편집 전 트리에서 --baseline-probe 를 먼저 찍는다(F-637)")
     return EXIT_OK
 
 
@@ -2349,6 +2460,9 @@ def baseline_probe(ledger: Ledger, allow_pass, budget_s: float) -> int:
                 res = "PASS" if result.ok else ("FAIL" if result.measured else "UNRUN")
                 if res == "UNRUN":
                     reason = "error:" + (result.error or "판정 불가")
+                elif res == "FAIL" and broken_command(result):
+                    # F-656 — 셸이 낸 명령 부재(경로 없는 이름) · 변수 미설정의 실패는 RED 증명이 아니다
+                    res, reason = "UNRUN", "broken:" + broken_command(result)
         counts[res] = counts.get(res, 0) + 1
         rows[gate.id] = {"result": res, "oracle_hash": h, "elapsed_s": round(elapsed, 3),
                          "timeout_s": timeout, "reason": reason}
@@ -2357,6 +2471,10 @@ def baseline_probe(ledger: Ledger, allow_pass, budget_s: float) -> int:
             print(f"  WARN {gate.id}: 기준선 미실행 — {reason} · BASELINE: required 원장의 --finalize 가 거부한다")
         if elapsed > timeout / 2:
             print(f"  WARN {gate.id}: 기준선 소요 {elapsed:.1f}s > TIMEOUT 절반 {timeout / 2:g}s — TIMEOUT 을 실측 소요로 다시 정한다(F-546)")
+        if gate.is_runnable and "TIMEOUT" not in gate.attrs and res in ("EXCLUDED", "FAIL"):
+            # F-579 — 기준선이 재지 않은(EXCLUDED) · 빨리 실패한(FAIL) 게이트는 통과 경로 소요를 모른다 — 선언이 없으면 기본값이 그대로 한도다
+            print(f"  WARN {gate.id}: 통과 경로 소요 미측정({res}) · TIMEOUT 미선언이라 기본 {DEFAULT_TIMEOUT_S:g}초 — "
+                  "통과 경로를 한 번 재어 TIMEOUT 을 적는다(F-579)")
         if res == "PASS" and gate.id not in allowed:
             bad_pass.append(gate.id)
             print(f"  PASS-ON-UNCHANGED {gate.id}: 구현 전 트리에서 이미 통과 — 변경을 재지 않는다(F-245). 의도면 --allow-pass {gate.id}")
@@ -2836,6 +2954,24 @@ def cross_session(ledger: Ledger) -> int:
         bad.append("oracle_hash 가 환경에 흔들린다 — 승인 도장이 cross-session 에서 깨진다")
     if base_env == moved_env:
         bad.append("env_fingerprint 가 환경을 반영하지 않는다 — provenance 축이 죽었다")
+    # F-629 — 같은 PATH 에서 claude CLI 판만 바뀌어도 증거 지문이 바뀌어야 한다(가짜 claude 두 판)
+    saved_path = os.environ.get("PATH", "")
+    with tempfile.TemporaryDirectory() as td:
+        fake = os.path.join(td, "claude")
+        os.environ["PATH"] = td + os.pathsep + saved_path
+        try:
+            fps = []
+            for ver in ("1.0.0 (Claude Code)", "2.0.0 (Claude Code)"):
+                with open(fake, "w") as fh:
+                    fh.write(f"#!/bin/sh\necho '{ver}'\n")
+                os.chmod(fake, 0o755)
+                _CLI_CACHE.clear()
+                fps.append(env_fingerprint())
+        finally:
+            os.environ["PATH"] = saved_path
+            _CLI_CACHE.clear()
+    if fps[0] == fps[1]:
+        bad.append("env_fingerprint 가 claude CLI 판을 반영하지 않는다 — CLI 로 재는 게이트의 결과 변화를 트리 탓으로 읽는다(F-629)")
     print("CROSS_SESSION:" + ("OK" if not bad else ";".join(bad)))
     return EXIT_UNMET if bad else EXIT_OK
 

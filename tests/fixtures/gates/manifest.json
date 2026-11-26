@@ -1709,6 +1709,40 @@
       "why": "F-334 — 확정 원장에 게이트를 더하면 그 게이트만 도장이 필요하다. 헤더를 지우고 전부 다시 찍는 우회는 다른 게이트의 변경까지 재승인한다"
     },
     {
+      "id": "f747-only-warns-other-stamp-drift",
+      "category": "approved",
+      "ledger": "amend/two-gates-draft.md",
+      "pre": [
+        [
+          "--finalize"
+        ]
+      ],
+      "edits": [
+        {
+          "replace": [
+            "CRITERION: G1 이 통과한다",
+            "CRITERION: G1 이 두 번 통과한다"
+          ]
+        }
+      ],
+      "args": [
+        "--only",
+        "G2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "expect_stdout": [
+          "G1: --only 밖 게이트의 APPROVED_ORACLE_HASH 불일치",
+          "재승인 `--finalize --only G1` 뒤 `--only G1` 재실행"
+        ],
+        "expect_stdout_absent": [
+          "G2: --only 밖"
+        ]
+      },
+      "why": "F-747 — 확정 뒤 S0 CRITERION 을 고친 원장이 단계마다 --only 만 돌아 하루 동안 불일치가 드러나지 않았다. --only 실행이 범위 밖 도장 불일치를 알리고 재승인 순서 전체(재승인 → 재실행)를 적는다"
+    },
+    {
       "id": "finalize-only-refuses-changed-other",
       "category": "finalize",
       "ledger": "amend/two-gates-draft.md",
@@ -1942,6 +1976,29 @@
         ]
       },
       "why": "의도된 무변경 PASS(회귀 방지 게이트)는 --allow-pass 로 이름을 대면 통과한다"
+    },
+    {
+      "id": "f579-untimed-pass-path-warns",
+      "category": "baseline",
+      "ledger": "baseline/probe.md",
+      "args": [
+        "--baseline-probe",
+        "--allow-pass",
+        "B2"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "WARN B1: 통과 경로 소요 미측정(FAIL)",
+          "WARN B3: 통과 경로 소요 미측정(EXCLUDED)"
+        ],
+        "expect_stdout_absent": [
+          "WARN B2: 통과 경로",
+          "WARN M1: 통과 경로"
+        ]
+      },
+      "why": "F-579 — 기준선이 재지 않은(EXCLUDED) · 빨리 실패한(FAIL) 실행 게이트에 TIMEOUT 이 없으면 통과 경로 소요를 모른다. 재었거나(PASS) 수동이면 조용하다"
     },
     {
       "id": "baseline-oracle-hash-recorded",
@@ -2280,10 +2337,34 @@
           "BASELINE U2 UNRUN",
           "reason=env-missing:FZ_BASELINE_SURELY_UNSET",
           "WARN U1",
-          "WARN U2"
+          "WARN U2",
+          "BASELINE U3 UNRUN",
+          "reason=broken:",
+          "WARN U3",
+          "BASELINE U4 UNRUN",
+          "reason=broken:param-unset:FZ_BASELINE_U4_SURELY_UNSET",
+          "reason=broken:command-not-found:fz-no-such-cmd-xyz"
         ]
       },
-      "why": "도구 · 환경 부재는 실패가 아니라 미실행이다(S20 · F-342 와 같은 축) — WARN 이고 프로브는 exit 0"
+      "why": "도구 · 환경 부재는 실패가 아니라 미실행이다(S20 · F-342 와 같은 축) — WARN 이고 프로브는 exit 0 · 명령이 깨진 CHECK 의 실패도 RED 증명이 아니라 미실행이다(F-656)"
+    },
+    {
+      "id": "f656-baseline-red-not-broken",
+      "category": "baseline",
+      "ledger": "baseline/red-proof.md",
+      "args": [
+        "--baseline-probe"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": false,
+        "expect_stdout": [
+          "BASELINE R1 FAIL",
+          "BASELINE R2 FAIL",
+          "BASELINE R3 FAIL"
+        ]
+      },
+      "why": "F-656 음성 — CHECK 가 찍은 'not found' 줄 · 아직 만들지 않은 경로 산출물의 부재는 정상 RED 다. 셸이 낸 이름 부재 · 변수 미설정만 UNRUN"
     },
     {
       "id": "legacy-ledger-finalize-unchanged",
@@ -2854,6 +2935,105 @@
         ]
       },
       "why": "F-341 — [기본 off] Step 의 CHECK 가 작업 트리 부재(! grep … \"$R/…\")를 단언하면 Step 자신의 기본 off 와 모순된다"
+    },
+    {
+      "id": "f731-negated-under-errexit",
+      "category": "fromplan",
+      "ledger": "fromplan/plan-lints.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "L8: set -e 아래 `! grep -q bad notes.txt` 는 실패해도 멈추지 않는다"
+        ],
+        "expect_stdout_absent": [
+          "L9: set -e 아래"
+        ]
+      },
+      "why": "F-731 — errexit 는 부정한 파이프라인의 실패를 무시한다. 마지막이 아닌 조각의 `! cmd` 는 단언이 아니다(마지막 조각은 종료 코드가 된다)"
+    },
+    {
+      "id": "f760-state-mutating-without-release-procedure",
+      "category": "fromplan",
+      "ledger": "fromplan/state-mutating.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout": [
+          "원장: 계획이 상태를 바꾼다(",
+          "releaseProcedure 가 없다"
+        ]
+      },
+      "why": "F-760 — 처분 · 백필 계획의 원장에 RELEASE_PROCEDURE 가 없어 post_procedure 축이 n/a 로 지나갔고 절대값 오라클이 계획 자신의 처분 뒤 깨졌다"
+    },
+    {
+      "id": "f760-release-procedure-header-rendered",
+      "category": "fromplan",
+      "ledger": "fromplan/state-mutating-declared.json",
+      "mode": "from-plan",
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 10,
+        "expect_stdout_absent": [
+          "releaseProcedure 가 없다"
+        ],
+        "expect_contains": {
+          "RELEASE_PROCEDURE: 처분 뒤 --reverify": 1
+        }
+      },
+      "why": "F-760 대조 — releaseProcedure 를 주면 원장 머리로 옮기고 경고하지 않는다"
+    },
+    {
+      "id": "f637-writescope-dirty-warns",
+      "category": "fromplan",
+      "ledger": "fromplan/scope-dirty.json",
+      "mode": "from-plan",
+      "git_repo": "fromplan/scope-repo",
+      "dirty": [
+        "scope_target.py"
+      ],
+      "args": [
+        "--impl-root",
+        "tests/fixtures/gates/fromplan/scope-repo"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 20,
+        "expect_stdout": [
+          "writeScope 파일 1개가 이미 바뀌었다(scope_target.py)"
+        ]
+      },
+      "why": "F-637 — Gate 2 전에 코드를 고쳐 기준선 측정을 잃었다. from-plan 이 writeScope 의 미커밋 변경을 경고한다"
+    },
+    {
+      "id": "f637-writescope-clean-quiet",
+      "category": "fromplan",
+      "ledger": "fromplan/scope-dirty.json",
+      "mode": "from-plan",
+      "git_repo": "fromplan/scope-repo",
+      "dirty": [
+        "scope_other.py"
+      ],
+      "args": [
+        "--impl-root",
+        "tests/fixtures/gates/fromplan/scope-repo"
+      ],
+      "expect": {
+        "exit": 0,
+        "mutates": true,
+        "max_seconds": 20,
+        "expect_stdout_absent": [
+          "이미 바뀌었다",
+          "writeScope 의 변경 여부를 재지 못했다"
+        ]
+      },
+      "why": "F-637 대조 — writeScope 밖 파일(scope_other.py)만 바뀌었으면 경고하지 않는다 · git 상태는 읽었다"
     },
     {
       "id": "f417-manual-reason-missing",

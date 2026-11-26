@@ -1,0 +1,18 @@
+{
+  "title": "상태 변경 계획",
+  "steps": [
+    {
+      "id": "D1",
+      "title": "처분 적용",
+      "files": [
+        "APPLIED.md"
+      ],
+      "verify": {
+        "kind": "command",
+        "criterion": "처분 행이 있다",
+        "command": "python3 eject_findings.py --dispose expired --id F-001 && echo D1_OK",
+        "expect": "D1_OK"
+      }
+    }
+  ]
+}
