@@ -406,8 +406,73 @@ F-622	skills/fz-plan/SKILL.md	has	`pin: [경로]` 를 함께 싣는다
 F-726	modules/cross-validation.md	has	**대조값은 주장이 겨누는 영역 · 언어 · 구간 안에서 고른다**
 F-726	skills/fz-plan/SKILL.md	has	WARN 대조값 없는 부재 주장 {M}건
 # F-727 — T-pitfall 경고는 fz-guard 문서의 규칙 표 · 판정 절에 있고 끄기 키가 없다는 것을 적는다
-F-727	mods/fz-guard/CLAUDE.md	has	| T-pitfall | F-654 · F-673 · F-727 |
+F-727	mods/fz-guard/CLAUDE.md	has	| T-pitfall | F-654 · F-673 · F-727 · 
 F-727	mods/fz-guard/CLAUDE.md	has	(T-pitfall 경고는 `all` 로만 꺼진다)
 # F-644 · F-645 — Curate 판정 안내가 검사기의 새 키(premiseCheck · citeExpect)를 이름으로 적는다(안내 없이 검사만 있으면 Lead 가 무엇을 써야 통과하는지 모른다)
-F-644	skills/fz-peer-review/SKILL.md	has	`premiseCheck{how: measured, note}`(그 전제를 잰 방법 — F-644)
+F-644	skills/fz-peer-review/SKILL.md	has	`premiseCheck{how: measured, note}`(그 전제 · 근거를 잰 방법 — F-644)
 F-645	skills/fz-peer-review/SKILL.md	has	`citeExpect{"path:line": 토큰}`(F-645)
+# 2026-11-26 수리 wave — Lead 판단 실수 엔트리를 기존 원칙에 사례로 합친 문장(지워지면 그 엔트리 배출이 되돌아간다)
+F-661	modules/lead-reasoning.md	has	그 원칙이 가리키는 종류 전체(같은 축의 항목)를 한 번 세고
+F-633	modules/lead-reasoning.md	has	'판정 불가 + 잴 것 + 비용' 으로 보고한다
+F-087	modules/lead-reasoning.md	has	진단 · 지연 · 실패의 원인 서술 + 원인을 되돌린 대조군 1회
+F-680	modules/lead-reasoning.md	has	기록에 사유가 없으면 '사유는 기록에 없다' 로 적는다
+F-659	modules/lead-reasoning.md	has	"측정했다/확인했다/스모크로 쟀다/하면 된다" 도 같은 결론이다
+F-674	modules/lead-reasoning.md	has	안내 문장이면 설치 꼴·명령 순서·도구 판·시작 상태
+F-132	modules/lead-reasoning.md	has	발견한 위험을 "조건이 좁다/드물다" 로 미루는 것도 현재 조건 판단이다
+F-664	modules/cross-validation.md	has	**승인 질문 · 선택지에 실은 개수도 산출물이다**
+F-664	modules/lead-reasoning.md	has	보고 · 승인 질문 선택지가 전수/카운트/부정 주장
+F-642	modules/cross-validation.md	has	조합 격자(차등 시험)의 "놓침 0 · 불일치 0" 은 격자의 축이 단위다
+F-635	modules/cross-validation.md	has	다시 짠 판정 줄이 하나라도 있으면 보고에 '근사' 라고 적는다
+F-635	modules/cross-validation.md	has	보고의 분모는 찾은 수가 아니라 읽은 수다
+F-137	modules/cross-validation.md	has	패턴을 넓혀 다시 재지 말고 관계(누가 부르나) 추적으로 바꾼다
+F-153	modules/peer-review-gates.md	has	판정 보류 = 근거 부족 신호
+F-153	modules/review-structural-axes.md	has	두 가드의 **목적**을 각각 서술한다
+F-689	modules/gates.md	has	이 프로브는 본 실행 앞의 스모크이기도 하다
+F-713	modules/gates.md	has	첫 실행의 사용법 오류 · 기준 커밋 부재는 묶음 전부를 한꺼번에 막는다(F-689 · F-713)
+F-668	modules/gates.md	has	앞 Step 게이트의 근거 파일을 고쳤으면 그 게이트도 `--only` 에 넣고(F-668)
+F-609	modules/gates.md	has	Step · 수정마다 전체를 다시 돌리지 않는다(F-609)
+F-627	modules/gates.md	has	판정 함수 · 술어 표의 입력 행은 잰 값만 쓰고
+F-698	modules/gates.md	has	기대 꼴에 소스 줄 번호를 박지 않는다
+F-665	modules/cross-validation.md	has	새 검사는 양성 대조 하나와 뭉친 · 빈 입력 하나를 먼저 넣고
+F-693	modules/cross-validation.md	has	파생한 대상은 비어 있지 않고 실제로 있는지 본 뒤 그 경로를 출력에 함께 찍는다
+F-630	modules/cross-validation.md	has	라벨은 찍힌 상태로 붙인다(F-630)
+F-670	guides/skill-authoring.md	has	Lead 메모는 설계 메모를 요약하지 않고 설계 기록에 없는 사실만 적는다
+F-631	guides/skill-authoring.md	has	출처 표의 행을 열어 '행에서 가져오라' 로 쓴다(F-631)
+F-671	guides/skill-authoring.md	has	뒤 조각의 과제문은 앞 조각이 착지한 뒤 쓰고
+F-709	guides/skill-authoring.md	has	자원은 이름 조건이 아니라 확인한 식별자(UDID · 절대 경로)로 넘긴다(F-709)
+F-696	guides/skill-authoring.md	has	앞 라운드 판정표의 낮춤 · 미룸 행을 전부 옮긴다(F-696)
+F-245	modules/gates.md	has	지목한 함수 · 심볼에 결함을 넣은 사본에서 FAIL 하는 셀을 함께 둔다(F-245)
+F-304	modules/gates.md	has	검사한 행 집합(= 기대 집합)을 단언한다 — 0건 매칭은 통과가 아니다(F-304)
+F-639	modules/gates.md	has	그 게이트를 이름으로 가리킨 답이 올 때까지 사슬의 앞 단계
+F-639	modules/gates.md	has	탐색 깊이 안의 `gates/plan.md` 사본은 별개 원장으로 잡혀
+F-707	modules/gates.md	has	그럴듯한 오구현 변이(다른 피연산자 반환 · 연산자 교체)도 1개 이상 돌려
+F-702	skills/fz-fix/SKILL.md	has	hunk 가 여럿이면 hunk 마다 따로 되돌려
+F-702	modules/gates.md	has	hunk 마다 따로 되돌려
+F-126	skills/fz-code/SKILL.md	has	대체 대상이 닿던 기능의 종착 함수를 부르는 기존 호출부(형제 진입점)도 모두 찾아
+F-623	skills/fz-code/SKILL.md	has	light 는 절차의 양을 고르는 손잡이지 생산 주체를 고정하지 않는다
+F-638	skills/fz-code/SKILL.md	has	세션 중 알린 결정('…안으로 정리')을 측정이 뒤집었으면 완료 보고 맨 위에서 정정했는가? (F-638) *[candidate
+F-703	skills/fz-fix/references/fix-candidates.md	has	**인용한 선례 대조**
+F-704	skills/fz-fix/references/fix-candidates.md	has	UIKit 이 캐시하는 override getter
+F-648	skills/fz-plan/SKILL.md	has	결정의 이름 · 번호만 싣지 않는다
+F-655	skills/fz-plan/SKILL.md	has	'못 씀' 과 '안 시킴' 을 가르는 값싼 측정을 먼저
+F-658	skills/fz-plan/SKILL.md	has	(완전성을 요구받은 과제면 남긴 틈 전부)
+F-651	skills/fz-plan/SKILL.md	has	요구가 이름으로 든 파일이 어느 Step 파일 목록에도 없으면 같은 처분이다(F-651)
+F-086	modules/peer-review-gates.md	has	말단 구현까지 Read 한 파일:줄을 적는다(F-086)
+F-113	skills/fz-review/SKILL.md	has	갈래 수 N 과 구현 메커니즘 수 M 을 대조한다
+F-131	modules/build.md	has	기기마다 설치된 빌드(이번 Step · 이전 Step)를 요청 문장에 적는다
+F-154	agents/plan-edge-case.md	has	같은 입력을 받는 경쟁 핸들러
+F-438	modules/review-structural-axes.md	has	같은 근거를 쓰는 옆 방어 줄도 같은 판정에 묶어 함께 낸다(F-438)
+F-657	guides/skill-authoring.md	has	같은 문안을 셋 이상의 받는 쪽(에이전트 · 스킬 · 워크플로)에 넣으면
+F-720	guides/model-guide.md	has	이 상한은 **세션 전역**이다
+F-643	skills/fz-peer-review/SKILL.md	has	이 절은 리포트(로컬)에만 있고 게시 body 에서는 빠진다
+F-650	modules/plan-direction-preflight.md	has	그 자산의 입력 계약과 대상의 실제 입력을 나란히 놓은 표
+F-580	skills/fz-peer-review/SKILL.md	has	--test-run --tier {Tier}` 가 exit 0 이어야 한다
+F-623	modules/mode-gate.md	has	세션 위임 규율이 있으면 Step 수행은 워커
+F-724	skills/fz-review/SKILL.md	has	`MISSING-DELETED` 면 diff 를 `git diff HEAD` 로 다시 뜬다
+F-621	modules/gates.md	has	올바른 수정 모형 사본에서 그 셀이 GREEN 에 닿는지도 대조하고
+F-715	modules/gates.md	has	올바른 수정 모형 사본에서 그 셀이 GREEN 에 닿는지도 대조하고
+F-681	modules/gates.md	has	앞 Step 이 입력 문법을 바꾸면 뒤 Step 단언을 그 문법으로 다시 대조한다(F-621 · F-715 · F-681)
+F-656	modules/gates.md	has	아직 만들지 않은 산출물(경로)을 부르는 CHECK 의 실패는 RED 다(F-656)
+F-666	skills/fz-plan/SKILL.md	has	기준선 소요(실측)는 일정과 구현 진입 목록에 싣는다
+F-700	skills/fz-commit/SKILL.md	has	묶음 방식을 고르기 전에 Step × 파일 중첩 분포를 잰다
+F-647	skills/fz-commit/SKILL.md	has	첫 회차는 커밋 조립과 몇 초짜리 저장소 전체 검사(lint · 개수 대조)만 돌리고
