@@ -2,7 +2,7 @@
 # modes: --scope caller=manual last-pass=7b89bd4 result=부분집합 선택 — 기본 실행이 choice · wrapper 를 다 돈다
 # gpt-choice.sh 계약 러너 — 세션 1회 GPT 모델·effort 선택(options · get · set · config)과 래퍼(gpt-exec.sh)의 결정 순서를 합성 입력으로 본다.
 #   --scope choice : get exit 0/3/4/5/11 · set 0/10/11 과 실패 시 파일 미기록 · 원자 기록(tmp+mv) · config config 센티넬 ·
-#                    options JSON 모양(id·label 분리 · effort 교집합 · skip · config effort 미지원 표시) · config 엄격 판독 ·
+#                    options JSON 모양(id·label 분리 · effort 교집합 · skip · config effort 미지원 표시 · 캐시 밖 config 모델 표시 F-711) · config 엄격 판독 ·
 #                    자율 판정 · 두 스크립트의 effort 화이트리스트 일치 · config(config.toml 최상위 값 · 캐시 비의존) ·
 #                    GPT 미사용(off — modules/gpt-strategy.md § GPT 미사용): options 모델 질문의 off(config + 모델 2 + off ≤ 4) ·
 #                    캐시 없음·손상·python3 없음이어도 config / off 로 묻는 degraded · set --model off 는 캐시 없이 기록 · off 짝 손상 판정 ·
@@ -231,6 +231,9 @@ model_reasoning_effort = "high"'
   mk_home ch-cacheonly "$cache_a" ''
   mk_home ch-none '' ''
   mk_home ch-bad 'not json {' 'model = "fake-alpha"'
+  # config 최상위 model 이 모델 목록 캐시에 아예 없다(숨김도 아님) — F-711 의 gpt-6.2-sol 모양
+  mk_home ch-absent "$cache_a" 'model = "fake-absent"
+model_reasoning_effort = "high"'
   mkdir -p "$T/home2/.codex"; cp "$T/ch-a/models_cache.json" "$T/ch-a/config.toml" "$T/home2/.codex/"
 
   # ── get: 선택 없음 — 자율 판정은 autonomy_decide.py 가 한다(원문 비교면 ' Autonomous ' 에서 헤드리스가 질문을 시도한다)
@@ -435,6 +438,21 @@ model_reasoning_effort = "high"'
   check "options python3 없음 → 0 · degraded python3-missing · config/off" "$(cat "$T/c-o-nopy.rc")|$(js o-nopy '[d["degraded"]] + [c["id"] for c in d["questions"]["model"]["choices"]] + [d["questions"]["effort"]["skip"]]')" "0|python3-missing,config,off,True"
   check "options python3 없음: effort 화이트리스트 그대로" "$(js o-nopy 'd["effort_whitelist"]')" "low,medium,high,xhigh,max,ultra"
   check "options 기본 CODEX_HOME(HOME/.codex) 판독" "$(js o-def 'd["config"]["model"]')" fake-alpha
+  # ── F-711 — config 모델이 모델 목록 캐시에 없으면 첫 선택지로 그대로 내되 '목록에 없음 — 계정 실행 미확인' 을 단다(label · config.in_cache).
+  #    음성 대조: 캐시의 목록 모델(o-a) · 캐시의 숨김 모델(o-hid — 캐시 밖이 아니다) 은 표시 없음 · config 모델 모름(o-prof '?')은 null · degraded 는 칸 없음
+  CH="$T/ch-absent"; cell o-absent - - options
+  CH="$T/ch-hid"; cell o-hid - - options; CH="$T/ch-a"
+  check "f711-options-config-not-in-cache-label — 캐시 밖 config 모델: config 선택지 label 에 '목록에 없음 — 계정 실행 미확인'" \
+    "$(rc o-absent)|$(js o-absent 'd["questions"]["model"]["choices"][0]["label"]')" "0|config 기본 (fake-absent · 목록에 없음 — 계정 실행 미확인 · effort 는 config 만)"
+  check "f711-options-config-not-in-cache-field — options JSON config.in_cache = false" "$(js o-absent 'd["config"]["in_cache"]')" False
+  check "f711-options-config-not-in-cache-still-offered — 선택지는 빼지 않는다(config + 목록 앞 2 + off · id·label 두 키)" \
+    "$(js o-absent '[c["id"] for c in d["questions"]["model"]["choices"]] + [all(sorted(c) == ["id", "label"] for c in d["questions"]["model"]["choices"])]')" "config,fake-alpha,fake-beta,off,True"
+  check "f711-options-config-in-cache-control — 캐시의 목록 모델(o-a) · 숨김 모델(o-hid): in_cache true · 표시 없음" \
+    "$(js o-a 'd["config"]["in_cache"]')|$(js o-hid 'd["config"]["in_cache"]')|$(js o-hid 'd["questions"]["model"]["choices"][0]["label"]')|$(js o-a 'any("목록에 없음" in c["label"] for c in d["questions"]["model"]["choices"])')" \
+    "True|True|config 기본 (fake-hidden)|False"
+  check "f711-options-config-unknown-control — config 모델 모름('?')은 in_cache null · '목록에 없음' 표시 없음" \
+    "$(js o-prof 'd["config"]["in_cache"]')|$(js o-prof '"목록에 없음" in d["questions"]["model"]["choices"][0]["label"]')" "None|False"
+  check "f711-options-degraded-no-field — degraded(캐시 없음)는 캐시 밖을 가릴 수 없어 in_cache 칸이 없다" "$(js o-nocache '"in_cache" in d["config"]')" False
 
   # ── config: config.toml 최상위 값 — 래퍼 GPT-CHOICE 표시용. options · set 과 같은 엄격 판독이고 캐시 · 선택 파일을 읽지 않는다
   cell k-a - - config

@@ -36,7 +36,8 @@
 #           ⊕ 선택이 없고 GPT CLI 가 없으면 묻지 않고 0 · 'model=off effort=off' — off 를 기록하고(저장할 수 없는 세션이면 기록 없이) stderr 안내
 #   set     0=기록 · 10=검증 실패(fail-closed — 파일을 쓰지 않는다) · 11=사전조건(세션 id·저장 위치·모델 목록 캐시 없음 · 쓰기 실패)
 #           --model off 는 모델 목록 캐시 · config · python3 를 보지 않는다(11 은 세션 id · 저장 위치 · 쓰기 실패뿐)
-#   options 0=JSON — 모델 질문 = config + 목록 모델 최대 2 + off(4 이하). 모델 목록 캐시 없음·판독 불가 · python3 없음이면
+#   options 0=JSON — 모델 질문 = config + 목록 모델 최대 2 + off(4 이하). config 모델이 캐시에 없으면 그 선택지 label 에
+#           '목록에 없음 — 계정 실행 미확인' · config.in_cache=false(있으면 true · config 모델 모름 null). 모델 목록 캐시 없음·판독 불가 · python3 없음이면
 #           'degraded' 키(사유)와 config / off 두 선택지(effort 질문 skip) — 그래도 묻는다(off 를 고를 수 있어야 한다).
 #           11=degraded JSON 을 만드는 python 자체 실패뿐 · 10=사용법
 #   config  0=stdout 'model=<값|?> effort=<값|?>'(config.toml 이 없거나 값을 모르면 '?') · 11=python3 없음·판독 실패
@@ -300,7 +301,12 @@ top, more = others[:2], others[2:]
 # ⛔ 지원 effort 를 모르는 모델(config 모델을 모름 · 캐시에 목록 없음)은 set 이 명시 effort 와의 짝을 exit 10 으로 거부한다 —
 #    label 에 적어 두지 않으면 사용자가 '기본 모델 + effort 올리기'를 고르고, 같은 선택지로 다시 물어도 또 실패한다
 ONLY_CFG = " · effort 는 config 만"
-model_choices = [{"id": "config", "label": f"config 기본 ({cfg_model}{'' if levels(cm) is not None else ONLY_CFG})"}]
+# ⛔ config 모델이 모델 목록 캐시에 아예 없으면(숨김도 아님) 계정이 그 모델을 실행하는지 모른다 — 그대로 첫 선택지로 내면 고른 뒤 호출마다
+#    400(model_not_found)일 수 있다(F-711 — 캐시 밖 config 모델이 첫 선택지였다). 빼지 않고 label · config.in_cache 칸으로 알린다.
+#    실행 확인(최소 호출)은 하지 않는다 — 목록에 있다고 계정에서 도는 것도 아니다. config 모델을 모르면('?') None 이다
+UNLISTED = " · 목록에 없음 — 계정 실행 미확인"
+cfg_in_cache = None if cfg_model == "?" else cm is not None
+model_choices = [{"id": "config", "label": f"config 기본 ({cfg_model}{UNLISTED if cfg_in_cache is False else ''}{'' if levels(cm) is not None else ONLY_CFG})"}]
 model_choices += [{"id": m["slug"], "label": label(m) + ("" if levels(m) is not None else ONLY_CFG)} for m in top]
 model_choices.append(OFF)
 
@@ -325,7 +331,8 @@ effort_choices = [{"id": "config", "label": f"config 기본 ({cfg_effort}{note})
 effort_choices += [{"id": w, "label": w} for w in WL if w in pick]
 
 out = {
-    "config": {"model": cfg_model, "effort": cfg_effort},
+    # in_cache — config 모델이 모델 목록 캐시에 있는가(false = 목록에 없음 · 계정 실행 미확인 · null = config 모델 모름). degraded 출력에는 없다
+    "config": {"model": cfg_model, "effort": cfg_effort, "in_cache": cfg_in_cache},
     "models": [{"id": m["slug"], "label": label(m),
                 "default_effort": m["default_reasoning_level"] if isinstance(m.get("default_reasoning_level"), str) else "?",
                 "efforts": levels(m)} for m in listed],

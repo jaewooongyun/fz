@@ -256,7 +256,23 @@ check "f596-unknown-option-fail-closed — 표에 없는 옵션(--pre)이면 패
 check "f596-cd-relative-fail-closed — cd 뒤 상대 경로 검색은 패턴을 가르지 않는다(15)" "$(f596 f596-cd "cd $HREAL/dev/repo && rg -n '\\.claude/' .")" "15|금지 산출물 참조"
 check "f596-quoted-operator-is-a-word — 따옴표 안 '|' 는 파이프가 아니다: cat '|' rg review-report.md 는 cat 하나의 읽기(15 · GPT check 8.5 P2)" "$(f596 f596-qop "cat '|' rg review-report.md")" "15|금지 산출물 참조"
 check "f596-escaped-operator-is-a-word — 역슬래시로 막은 ';' 도 낱말이다: cat \\; rg review-report.md 는 15" "$(f596 f596-eop "cat \\; rg review-report.md")" "15|금지 산출물 참조"
+check "f596-git-grep-pattern — git grep -n '\\.claude/…' HEAD -- src 는 적중 0 · exit 0(실 rollout 에서 rg 다음으로 많은 검색)" "$(f596 f596-gitgrep "git grep -n '\\.claude/(projects|hooks)' HEAD -- src")" "0|-"
+check "f596-git-global-option-fail-closed — git -C 경로 grep 은 읽지 않는다(15)" "$(f596 f596-gitc "git -C $HREAL/dev/repo grep -n '\\.claude/'")" "15|금지 산출물 참조"
 check "f596-real-pipe-still-splits — 따옴표 밖 파이프 뒤 rg 패턴은 그대로 면제(0)" "$(f596 f596-pipe "cat $HREAL/dev/repo/README.md | rg -n 'review-report\\.md'")" "0|-"
+# ④b-2' F-596 재관측(11-25) — rg --files 모드(패턴 없음 · 위치 인자는 전부 경로)와 `!` 로 시작하는 -g · --glob 값(제외 글롭 — 그 경로를 읽지 않는다).
+#   두 명령은 그 run(gpt-e80b9a269b91.audit.json)의 적중 둘 원문 그대로다(작업 폴더 = 대상 저장소 · cd 없음).
+#   ⛔ 음성 대조 — 포함 글롭(-g '.claude/**') · --files 의 금지 경로 인자(첫 위치 인자를 패턴으로 빼면 놓친다) · 제외 글롭 뒤 허용 밖 뿌리 ·
+#      --files 에 -e 를 붙인 꼴은 그대로 15 · '금지 산출물 참조'
+check "f596-files-exclude-glob-entry — 엔트리 재현 명령 rg --files -g '!.claude/**' … scripts mods/fz-compact modules tests 는 적중 0 · exit 0" \
+  "$(f596 f596-files-entry "rg --files -g '!node_modules' -g '!.git' -g '!.claude/**' -g '!.fz-work/**' scripts mods/fz-compact modules tests")" "0|-"
+check "f596-files-exclude-glob-cwd — 같은 run 의 둘째 적중(위치 인자 없는 rg --files · 포함 글롭 셋 + 제외 글롭 셋)은 적중 0 · exit 0" \
+  "$(f596 f596-files-cwd "rg --files -g '*.swift' -g 'Package.swift' -g '*.xcodeproj/**' -g '!.claude/**' -g '!.fz-work/**' -g '!node_modules/**'")" "0|-"
+check "f596-search-exclude-glob — 검색 모드의 제외 글롭 네 꼴(-g '!…' · -g'!…' 붙인 값 · --glob='!…' · --glob '!…')도 면제 · exit 0" \
+  "$(f596 f596-search-excl "rg -n TODO -g '!.claude/**' $HREAL/dev/repo")|$(f596 f596-search-excl-att "rg -n TODO -g'!.claude/**' $HREAL/dev/repo")|$(f596 f596-search-excl-long "rg -n TODO --glob='!.claude/**' $HREAL/dev/repo")|$(f596 f596-search-excl-sep "rg -n TODO --glob '!.claude/**' $HREAL/dev/repo")" "0|-|0|-|0|-|0|-"
+check "f596-files-include-glob-hit — 포함 글롭 rg --files -g '.claude/**' <repo> 는 15" "$(f596 f596-files-incl "rg --files -g '.claude/**' $HREAL/dev/repo")" "15|금지 산출물 참조"
+check "f596-files-path-arg-hit — rg --files <repo>/.claude/ (첫 위치 인자도 경로)는 15" "$(f596 f596-files-path "rg --files $HREAL/dev/repo/.claude/")" "15|금지 산출물 참조"
+check "f596-files-exclude-forbidden-root-hit — 제외 글롭이 있어도 뿌리가 <home>/.claude/projects 면 15" "$(f596 f596-files-root "rg --files -g '!.claude/**' $HREAL/.claude/projects")" "15|금지 산출물 참조"
+check "f596-files-with-e-fail-closed — rg --files 에 -e 를 붙인 꼴은 읽지 않는다(15)" "$(f596 f596-files-e "rg --files -e '\\.claude/' $HREAL/dev/repo")" "15|금지 산출물 참조"
 # ④b-3 F-595 — 과제 프롬프트에 입력 폴더 읽기 허용 줄 · 감사 inputRefs(입력 참조 관측치 — 전체 열람 증명 아님 · rollout 없으면 "unknown")
 check "f595-prompt-input-allowed — 과제에 '상위 폴더가 막혀 있어도 입력 폴더 읽기 허용' 줄 1 · 읽기 제한 줄도 남는다" \
   "$(count plan '상위 폴더(임시 루트)가 막혀 있어도 읽기가 허용돼 있다')|$(count plan '읽기는 권한 프로필로 제한돼 있다')" "1|1"

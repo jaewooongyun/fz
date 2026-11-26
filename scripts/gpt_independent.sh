@@ -685,10 +685,11 @@ def forbid_hit(cmd):
        범용 이름(payload.json · *-result.json)은 저장소 파일에 흔해 보지 않는다 — 작업 폴더는 --deny 가 OS 수준에서 막는다
     ⛔ 글자를 지워 정규화하지 않는다 — 직렬화 층을 해독하고(원문 + JS 문자열 리터럴) 셸 단어로 나눈 뒤 `/` 성분을 본다.
        글자 제거는 정규식의 `\\.` · 이름의 `,` · `:` 까지 지워 정상 명령을 오염으로 만들었다(역검증 2차 ISSUE-001)
-    ⛔ 검색 패턴 인자는 경로가 아니다(F-596) — search_patterns 가 rg · grep 명령을 끝까지 읽어 낸 패턴 자리 낱말만 세 규칙에서 뺀다. 그 리터럴이
+    ⛔ 검색 패턴 인자 · 제외 글롭(-g '!…')은 읽는 경로가 아니다(F-596) — search_patterns 가 rg · grep 명령을 끝까지 읽어 낸 그 자리 낱말만 세 규칙에서 뺀다. 그 리터럴이
        있으면 원문 후보는 리터럴 밖 글자만 본다(원문 안의 같은 패턴이 다시 적중하지 않게). 못 읽은 명령은 예전처럼 원문 부분 일치다.
        ⛔ 금지 경로를 경로 인자로 주거나 실제로 읽으면 그대로 적중이다(`rg -n TODO <repo>/.claude/` · `rg '\\.claude/' ~/.claude/projects` · `cat ~/.claude/…`)
-    ⛔ 알려진 한계: search_patterns 가 못 읽는 꼴(-f · --files · 모르는 옵션 · 변수 · cd 뒤 상대 경로 · 허용 밖 경로 인자)의 패턴은 여전히 적중한다 —
+    ⛔ 알려진 한계: search_patterns 가 못 읽는 꼴(-f · 모르는 옵션 · 변수 · cd 뒤 상대 경로 · 허용 밖 경로 인자)의 패턴은 여전히 적중한다.
+       면제하지 않는 제외 꼴(--iglob '!…' · grep --exclude · --exclude-dir 값)도 금지 글자가 있으면 적중한다 —
        OS deny(--deny 작업 폴더)가 1차 방어다. 따옴표 없는 `review-report\\.md` 는 셸이 역슬래시를 걷어 실제 인자가 `review-report.md` 다
        · 변수 전개 · 이름 조립(`$'…'` · `${p}`)은 보지 않는다"""
     lits = js_literals(cmd)
@@ -715,7 +716,8 @@ def forbid_hit(cmd):
             return True
     return False
 # 검색 명령 옵션 표(F-596) — 짧은 값 없는 글자 · 짧은 값 받는 글자 · 긴 값 없는 이름 · 긴 값 받는 이름. ⛔ 확실한 것만 적는다 — 표에 없는 옵션이
-#   하나라도 있으면 그 명령은 못 읽은 것으로 보고(None) 예전 부분 일치로 돌아간다. -f · --file(패턴 파일 = 읽는 경로) · rg --files(패턴 없음)도 표에 없다
+#   하나라도 있으면 그 명령은 못 읽은 것으로 보고(None) 예전 부분 일치로 돌아간다. -f · --file(패턴 파일 = 읽는 경로)도 표에 없다.
+#   rg --files(패턴 없음)는 표 밖에서 search_patterns 가 따로 읽는다
 SEARCH_OPTS = {
     "rg": ("nNiSswxvclLFPUauoqHIz0bp", "egtTmABCMjdEr",
            {"hidden", "no-ignore", "no-ignore-vcs", "no-ignore-dot", "no-ignore-parent", "line-number", "no-line-number", "ignore-case",
@@ -735,12 +737,23 @@ SEARCH_OPTS = {
               "devices", "binary-files", "label"}),
 }
 SEARCH_OPTS["egrep"] = SEARCH_OPTS["fgrep"] = SEARCH_OPTS["grep"]
+# git grep(실 rollout 1,626파일 중 479줄 — rg 다음으로 많다 · 2026-11-26) — `git` 바로 뒤 `grep` 만 읽는다(git 전역 옵션이 끼면 못 읽은 것).
+#   위치 인자는 패턴 뒤 리비전 · pathspec 이다 — 리비전(HEAD 등)은 `..` 없는 상대 낱말이라 경로 검사를 그대로 지난다. ag · ack · xargs grep 은 같은
+#   기록에서 5줄이라 표에 넣지 않았다(예전 부분 일치 — 닫힌 쪽)
+SEARCH_OPTS["git grep"] = ("nNiIvwlLcEFGPhHoqzWpa", "eABCm",
+                           {"line-number", "ignore-case", "invert-match", "word-regexp", "files-with-matches", "name-only",
+                            "files-without-match", "count", "extended-regexp", "fixed-strings", "basic-regexp", "perl-regexp",
+                            "only-matching", "quiet", "null", "cached", "untracked", "no-index", "exclude-standard",
+                            "no-exclude-standard", "full-name", "heading", "break", "show-function", "function-context", "column",
+                            "all-match", "text", "no-color", "color", "recurse-submodules"},
+                           {"regexp", "max-count", "after-context", "before-context", "context", "max-depth", "threads", "color"})
 def search_patterns(ws, ops=None):
-    """셸 단어 목록 → rg · grep 의 검색 패턴 자리 낱말 위치(집합) · 못 읽으면 None(예전 부분 일치로 판정한다 — 닫힌 쪽으로 실패).
+    """셸 단어 목록 → rg · grep 의 면제 자리 낱말 위치(집합 — 검색 패턴 · 제외 글롭) · 못 읽으면 None(예전 부분 일치로 판정한다 — 닫힌 쪽으로 실패).
     읽는 조건(전부): 조각(`|` · `;` · `&&` · 괄호 · 리다이렉션 낱말 사이) 가운데 rg · grep 명령이 있고 그 옵션이 전부 SEARCH_OPTS 에 있다 ·
-    패턴이 있다(-e 값 · 없으면 첫 위치 인자) · 경로 인자가 전부 허용 저장소 · 격리 폴더 아래 절대 경로이거나 `..` 없는 상대 경로다(cd 가 있으면
-    상대 경로 · 경로 없음은 못 읽은 것) · 어느 낱말에도 변수 · 명령 치환(`$` · 백틱)이 없다. 패턴 자리 낱말 = -e · --regexp 값(붙인 꼴은 그 낱말)
-    또는 첫 위치 인자 — 그 밖 옵션 값은 패턴이 아니다(-g '.claude/*' 는 계속 본다)."""
+    패턴이 있다(-e 값 · 없으면 첫 위치 인자 — rg --files 는 패턴이 없고 위치 인자가 전부 경로다 · -e 와 함께면 못 읽은 것) · 경로 인자가 전부
+    허용 저장소 · 격리 폴더 아래 절대 경로이거나 `..` 없는 상대 경로다(cd 가 있으면 상대 경로 · 경로 없음은 못 읽은 것) · 어느 낱말에도 변수 ·
+    명령 치환(`$` · 백틱)이 없다. 면제 자리 낱말 = -e · --regexp 값(붙인 꼴은 그 낱말) 또는 첫 위치 인자 · `!` 로 시작하는 -g · --glob 값
+    (제외 글롭 — 그 경로를 읽지 않는다 · 11-25 재관측 `rg --files -g '!.claude/**'`). 그 밖 옵션 값은 면제가 아니다(포함 글롭 -g '.claude/*' 는 계속 본다)."""
     if any("$" in w or "`" in w for w in ws):
         return None
     segs, cur = [], []
@@ -758,11 +771,15 @@ def search_patterns(ws, ops=None):
     pats, seen = set(), False
     for seg, j in heads:
         tool = os.path.basename(ws[j]) if j is not None else ""
+        start = seg.index(j) + 1 if j is not None else 0
+        if tool == "git" and start < len(seg) and ws[seg[start]] == "grep":
+            tool, start = "git grep", start + 1
         if tool not in SEARCH_OPTS:
             continue
         seen = True
         short_nv, short_v, long_nv, long_v = SEARCH_OPTS[tool]
-        args, eps, pos, k, opts_done = seg[seg.index(j) + 1:], [], [], 0, False
+        args, eps, pos, k, opts_done = seg[start:], [], [], 0, False
+        excl, files = [], False                    # 제외 글롭 값 낱말(-g · --glob 값이 `!` 로 시작 — rg 표에만 있다) · rg --files 모드
         while k < len(args):
             w = ws[args[k]]
             if opts_done or w == "-" or not w.startswith("-"):
@@ -772,13 +789,17 @@ def search_patterns(ws, ops=None):
                 opts_done, k = True, k + 1
                 continue
             if w.startswith("--"):
-                name, eq, _ = w[2:].partition("=")
+                name, eq, val = w[2:].partition("=")
                 if eq:
                     if name not in long_v:
                         return None
                     if name == "regexp":
                         eps.append(args[k])
+                    if name == "glob" and val.startswith("!"):
+                        excl.append(args[k])
                     k += 1
+                elif tool == "rg" and name == "files":
+                    files, k = True, k + 1
                 elif name in long_nv:
                     k += 1
                 elif name in long_v:
@@ -786,6 +807,8 @@ def search_patterns(ws, ops=None):
                         return None
                     if name == "regexp":
                         eps.append(args[k + 1])
+                    if name == "glob" and ws[args[k + 1]].startswith("!"):
+                        excl.append(args[k + 1])
                     k += 2
                 else:
                     return None
@@ -801,15 +824,22 @@ def search_patterns(ws, ops=None):
                 if m + 1 < len(w):                 # 붙인 값(-ePAT · -A2) — 그 낱말이 값이다
                     if c == "e":
                         eps.append(args[k])
+                    if c == "g" and w[m + 1:].startswith("!"):
+                        excl.append(args[k])
                 elif k + 1 < len(args):
                     if c == "e":
                         eps.append(args[k + 1])
+                    if c == "g" and ws[args[k + 1]].startswith("!"):
+                        excl.append(args[k + 1])
                     took = 2
                 else:
                     return None
                 break
             k += took
-        if not eps:
+        if files:                                  # rg --files — 검색하지 않고 파일 이름만 낸다: 패턴이 없고 위치 인자는 전부 경로다
+            if eps:
+                return None                        # --files 에 -e 를 붙인 꼴은 읽지 않는다(닫힌 쪽)
+        elif not eps:
             if not pos:
                 return None
             eps, pos = [pos[0]], pos[1:]
@@ -823,6 +853,7 @@ def search_patterns(ws, ops=None):
         if not pos and has_cd:
             return None
         pats.update(eps)
+        pats.update(excl)
     return pats if seen else None
 FIND_ROOT = re.compile(rf"\bfind\s+{ROOTS}")                      # find 는 첫 인자가 검색 뿌리다
 MULTI_HEADS = [re.compile(r"\b(?:rg|fd|ag)\b"), re.compile(r"\bgrep\s+-[a-zA-Z]*[rR][a-zA-Z]*\b"),
