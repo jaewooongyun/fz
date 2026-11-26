@@ -835,6 +835,8 @@ GOOD: "세션당 1개 기능만. 매 세션 끝에 깨끗한 상태 인계."
 
 **측정 도구는 긴 측정 전에 이종 모델 적대 검토를 1회 받는다** — A/B 판정기 · 수집기처럼 몇 시간짜리 측정의 결론을 내는 도구는 self-test 가 green 이어도 fail-open 을 품는다(F-317: self-test 16/16 · 통합 9/9 green 인 판정기에서 GPT 적대 검토가 fail-open 21건을 잡았다). 검토 지적은 **문장 단위가 아니라 불변식 단위**로 반영한다 — 불변식(예: "진성 = 코드로 확인된 결함")을 먼저 쓰고 그 우회로를 다 막는다. 불변식마다 **증거 부재 = 위반**을 같이 쓴다 — "증거가 있으면 대조"는 증거를 안 주면 검사가 빠지는 fail-open 이다.
 
+**계약이 오라클보다 넓으면 라운드는 수렴하지 않는다** — 보편 계약을 fixture 로 재는 적대 라운드는 띄우기 **전에** 경계 표를 계약 항목과 나란히 대조한다: `python3 scripts/check_adversarial_record.py --boundary <경계 TSV> --contract <프롬프트> --run-id <ID> --pre <JSONL> [--root · --cell-out · --removal]`. 통과해야 띄우고, 라운드 기록의 `runId` 에 같은 값을 적는다 — `--policy dispositioned` 판정이 같은 실행 ID · 같은 계약의 사전 출력이 라운드 출력보다 앞인지 본다 (F-582)
+
 값싼 검출 9항(테스트가 자기 이름의 축을 보는가)은 `guides/skill-testing.md` § 5 에 있다.
 
 ---

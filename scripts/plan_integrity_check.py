@@ -19,7 +19,8 @@
     · `경로:줄` 바로 뒤 따옴표 인용이 그 원문 줄과 같은가(F-432 — 렌즈가 규칙을 반대로 인용했다 · `--root` 가 있을 때)
     · "F-NNN 이 기록한" 꼴 근거 문장의 문단에 엔트리 원문 줄 포인터(`entries/F-NNN-*.md:줄`)가 있는가(F-453 — 기억으로 인용했다)
     · 보강 표지 `⊕` 가 남았는가 · Step 제목 id 가 겹치는가(F-315 — 중간본도 단일 최신 상태로 접는다)
-    · (WARN) 수치 주장의 출처(F-185) · '0건 · 없다 · 미발견' 주장의 같은 줄 대조값(F-611 · F-726)
+    · (WARN) 수치 주장의 출처(F-185) · '0건 · 없다 · 미발견' 주장의 같은 줄 대조값(F-611 · F-726) ·
+      위험 표 완화 칸의 '결정 · decided · expected by decision' 주장의 같은 행 결정 출처(F-636)
   ⛔ 재지 못하는 것: 계획이 **요구사항을 충족하는가** · 그 파일이 실제로 존재하는가 ·
      verify 가 제목이 말하는 것을 측정하는가. 앞의 둘은 Lead·GPT 판정이고, 마지막은
      `gpt-exec.sh verify-gates` 의 measurement_fit 축이다.
@@ -247,6 +248,15 @@ ABSENCE_CLAIM = re.compile(r"(?<![\d.,])0\s?건|(?<!수 )(?<!필요 )없다(?![�
 #   F-번호 · `a.py:12` 같은 숫자만 든 표지는 대조값이 아니다)
 _POS_HIT = r"(?<![\w.:-])[1-9][\d,]*\s?(?:건|개(?!월)|곳|줄|행|파일|회|번|케이스|셀)"
 CONTROL_VALUE = re.compile(rf"\[대조:[^\]]*{_POS_HIT}|(?:양성 대조|저장소 전체)[^\n]*?{_POS_HIT}")
+# F-636 — 위험 표의 완화 칸(머리 '완화 · Mitigation' · fz 계획의 위험 표가 가장 많이 쓰는 '대응')의 '결정됨' 주장.
+# 한국어는 결정이 끝난 꼴만 잡는다 — 맨 '결정' 은 실측 계획에서 '…갈지 결정' · '사용자 결정(…)' 같은 미결 꼴이었다. 결정론 · 결정적도 아니다
+MITIGATION_HEAD = re.compile(r"(?i)완화|mitigation|대응")
+DECIDED_CLAIM = re.compile(r"(?i)\bdecided\b|\bby decision\b|결정(?:됨|됐|된|되었|했|함|대로|에\s?따|\s?사항|의 결과)")
+# 미결 표기 — F-636 이 처방한 '미결 — 사용자 결정' · 고친 행의 'NOT decided … user decides' 는 결정 주장이 아니다
+NOT_DECIDED = re.compile(r"(?i)\bnot\s+(?:yet\s+)?decided\b|\bundecided\b|\b(?:to|will) be decided\b|미결|결정되지|결정 ?전|결정할|결정해야|결정 필요|결정 대기")
+# 결정 출처 — 문서 · 기록 파일의 `파일:줄`(코드 `파일:줄` 은 위험이 사는 자리라 결정 출처가 아니다) · 따옴표 원문 인용(4글자 이상)
+DECISION_SOURCE = re.compile(r"[\w./-]+\.(?:md|markdown|txt|rst|adoc|tsv|csv|jsonl?|ya?ml|log):\d+|[\"“「][^\"”」\n]{4,}[\"”」]")
+TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*$")
 
 
 def _flat(s: str) -> str:
@@ -339,6 +349,46 @@ def absence_without_control(text: str) -> list:
     return out
 
 
+def _cells(row: str) -> list:
+    """마크다운 표 행의 칸 — 인라인 코드 안 `|` 와 `\\|` 는 칸 경계가 아니다."""
+    t = re.sub(r"`[^`]*`", lambda m: m.group(0).replace("|", "\0"), row.strip()).replace("\\|", "\0")
+    t = t[1:] if t.startswith("|") else t
+    t = t[:-1] if t.endswith("|") else t
+    return [c.replace("\0", "|").strip() for c in t.split("|")]
+
+
+def decided_without_source(text: str) -> list:
+    """F-636 — 위험 표(머리 행에 '완화 · Mitigation · 대응' 칸)의 완화 칸이 결정됨(결정됨 · 결정에 따라 · decided · expected by decision)을
+    말하는데 같은 행에 결정 출처(사용자 원문 인용 · 문서:줄)가 없는 행 → [(줄, 원문)]. 미결 표기('미결 — 사용자 결정' · 'NOT decided' ·
+    '…갈지 결정')는 결정 주장이 아니다. absence_without_control 과 같은 WARN 이고 같은 범위(코드 블록 · 완화 칸의 인라인 코드 제외)를 본다 —
+    완화 칸이 없는 표 · 산문은 보지 않는다.
+
+    - Note: 출처는 꼴만 본다 — 문서 · 기록 파일(md · txt · tsv · json · yaml …)의 `파일:줄` 이나 따옴표 인용이 같은 행에 있으면 출처로 센다
+      (코드 `파일:줄` 은 세지 않는다). 그 줄 · 인용이 그 결정을 적었는지는 Lead · 사람 몫이다. 한국어 맨 '결정'(사용자 결정 · 결정한다)은
+      결정 주장으로 세지 않는다 — 끝난 결정을 맨 낱말로만 적으면 놓친다."""
+    out, fence, col = [], False, None
+    lines = text.split("\n")
+    for i, ln in enumerate(lines, 1):
+        if ln.lstrip().startswith("```"):
+            fence, col = not fence, None
+            continue
+        if fence or not ln.lstrip().startswith("|"):
+            col = None                                  # 표가 끝났다 — 다음 표는 머리 행에서 완화 칸을 다시 잡는다
+            continue
+        if TABLE_SEP.match(ln):
+            continue
+        if i < len(lines) and TABLE_SEP.match(lines[i]):   # 머리 행(다음 줄이 구분 행)
+            col = next((k for k, h in enumerate(_cells(ln)) if MITIGATION_HEAD.search(h)), None)
+            continue
+        cells = _cells(ln)
+        if col is None or col >= len(cells):
+            continue
+        claim = re.sub(r"`[^`]*`", "", cells[col])
+        if DECIDED_CLAIM.search(claim) and not NOT_DECIDED.search(claim) and not DECISION_SOURCE.search(ln):
+            out.append((i, ln.strip()))
+    return out
+
+
 def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -362,6 +412,12 @@ def run_doc(path: str, root=None, findings=None, quiet: bool = False) -> int:
         if absent:
             print(f"  WARN 대조값 없는 부재 주장 {len(absent)}건 — 같은 줄에 [대조: 같은 도구가 주장이 겨누는 영역에서 찾은 양성 대조 · 저장소 전체 수]를 단다"
                   "(위반 아님 · exit 무관 · modules/cross-validation.md § Negative-Result Gate)")
+        undecided = decided_without_source(text)
+        for ln, s in undecided:
+            print(f"  WARN 출처 없는 결정 완화 줄 {ln}: {s[:100]}")
+        if undecided:
+            print(f"  WARN 출처 없는 결정 완화 {len(undecided)}건 — 위험 표 완화 칸이 '결정됨' 이면 같은 행에 결정 출처(사용자 원문 인용 · 문서:줄)를 단다 · "
+                  "못 달면 '미결 — 사용자 결정' 으로 쓴다(위반 아님 · exit 무관 · F-636)")
         for x in v:
             print(f"  VIOLATION {x}")
         print((f"integrity=FAIL ({len(v)} 위반) " if v else "INTEGRITY_PASS ") + os.path.basename(path))
@@ -443,7 +499,7 @@ def self_test(fixture_dir: str) -> int:
     doc = os.path.join(fixture_dir, "doc")
     doc_cells = 0
     if os.path.isdir(doc):                              # plan 문서 셀(round 2 S17) — 셀마다 양성(good.md) 대조를 함께 본다
-        doc_cells = 5
+        doc_cells = 7
         root, ents = os.path.join(doc, "root"), os.path.join(doc, "entries")
 
         def doc_v(name):
@@ -494,6 +550,34 @@ def self_test(fixture_dir: str) -> int:
         shown = re.findall(r"WARN 대조값 없는 부재 주장 줄 (\d+):", buf.getvalue())
         cell = "t-domain-run-doc-prints-warn-exit-0"
         if rc_doc == 0 and [int(x) for x in shown] == [5, 6, 7, 15, 16, 17, 18, 19] and "WARN 대조값 없는 부재 주장 8건" in buf.getvalue():
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — rc={rc_doc} 줄 {shown}")
+            print(f"FAIL {cell}: rc={rc_doc} 줄 {shown}")
+        # F-636 — 출처 없는 '결정됨' 완화 경고 줄 집합이 정확히 7(엔트리 plan-v1 수정 전 행) · 11(같은 행의 코드 파일:줄은 출처가 아니다) ·
+        #   18(한국어 '결정에 따라 예상됨') · 24('대응' 칸의 '결정됨'). 출처 있는 행(따옴표 인용 · 완화 칸 · 다른 칸의 문서:줄 · 「」 인용 ·
+        #   기록 tsv:줄) · 미결 표기(NOT decided · 미결 — 사용자 결정 · …갈지 결정 · 다르면 사용자 결정) · 결정론 · 인라인 코드 · 완화 칸 없는 표 ·
+        #   산문 · 코드 블록은 0
+        with open(os.path.join(doc, "risk-decided.md"), "r", encoding="utf-8") as fh:
+            text = fh.read()
+        got = [ln for ln, _s in decided_without_source(text)]
+        cell = "f636-risk-decided-without-source-warn"
+        if got == [7, 11, 18, 24] and check_doc(text)[0] == []:
+            passed += 1
+            if listing:
+                print(f"PASS {cell}")
+        else:
+            fails.append(f"{cell} — 경고 줄 {got} (기대 [7, 11, 18, 24])")
+            print(f"FAIL {cell}: 경고 줄 {got} (기대 [7, 11, 18, 24])")
+        # 운영 경로 — 같은 경고가 --plan-doc(run_doc) 출력에 실리고 exit 는 그대로다(fz-plan Gate 1 은 run_doc 출력을 읽는다)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc_doc = run_doc(os.path.join(doc, "risk-decided.md"))
+        shown = re.findall(r"WARN 출처 없는 결정 완화 줄 (\d+):", buf.getvalue())
+        cell = "f636-run-doc-prints-decided-warn-exit-0"
+        if rc_doc == 0 and [int(x) for x in shown] == [7, 11, 18, 24] and "WARN 출처 없는 결정 완화 4건" in buf.getvalue():
             passed += 1
             if listing:
                 print(f"PASS {cell}")

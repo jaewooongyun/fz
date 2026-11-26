@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # lint:no-root-anchor — 플러그인 루트를 참조하지 않는다. 인자로 받은 diff 파일과 저장소만 읽는다.
 # diff-parse: hunk-state — 파일 헤더(`---` · `+++`)는 `diff --git` 뒤 첫 `@@` 전에서만 읽는다. hunk 안의 `--- …` 는 '-- ' 로 시작하는 삭제 줄이다
-"""check_review_diff.py — 리뷰에 넘길 diff 가 untracked 신규 파일을 빠뜨리지 않았는지 대조한다(F-270).
+"""check_review_diff.py — 리뷰에 넘길 diff 가 untracked 신규 파일 · 지운 파일을 빠뜨리지 않았는지 대조한다(F-270 · F-724).
 
 왜: `git diff` 는 추적하지 않는 신규 파일을 내지 않는다. 리뷰 diff 가 신규 파일을 빠뜨려 변경의 60% 가 검증 대상에서
 누락됐다. fz-review 1단계는 신규 파일을 `git diff --no-index /dev/null {file}` 로 덧붙이라고 하지만 덧붙였는지 보는 검사가 없었다.
@@ -10,9 +10,11 @@
 `--- /dev/null` 다음 `+++ b/<경로>`, 또는 헤더의 `new file mode`(빈 파일 · 바이너리는 `---`/`+++` 짝이 없다)로 센다.
 개수만 비교하면 다른 파일이 수를 채운다 — 경로로 본다. git 이 따옴표로 감싼 경로(`"b/\355…"` — core.quotePath)는 풀어서 비교한다.
 리뷰 산출물(diff 파일 자신 · `--work-dir`)은 untracked 쪽에서 뺀다 — WORK_DIR 이 저장소 안이면 검사기가 자기 입력을 요구한다.
+삭제 대조(F-724): 같은 status 의 삭제 경로(` D` · `D ` — 개명의 원래 경로는 세지 않는다) ⊆ diff 의 삭제 파일(`deleted file mode` ·
+`+++ /dev/null`). `git add -N . ; git diff` 꼴은 삭제를 인덱스에 올려 diff 에서 지운다 — wave 다섯 곳의 리뷰 입력 빌더가 이 꼴로 삭제를 빠뜨렸다.
 
 사용: check_review_diff.py --diff FILE --repo DIR [--work-dir DIR] | --self-test
-exit: 0 신규 파일 전부 포함 · 1 빠진 신규 파일 있음(경로 출력) · 2 대조 불가(diff 를 못 읽음 · git 저장소 아님 — ⛔ 통과 아님)
+exit: 0 신규 · 삭제 파일 전부 포함 · 1 빠진 신규 · 삭제 파일 있음(경로 출력) · 2 대조 불가(diff 를 못 읽음 · git 저장소 아님 — ⛔ 통과 아님)
 """
 import argparse
 import codecs
@@ -23,12 +25,53 @@ import sys
 import tempfile
 
 
-def untracked(repo):
+def status_sets(repo):
+    """(untracked 경로 집합, 지운 경로 집합) · git 이 아니면 (None, None). -z 의 개명 · 복사(R · C)는 다음 항목이 원래 경로다 — 건너뛴다."""
     p = subprocess.run(["git", "-C", repo, "status", "--porcelain", "-z", "--untracked-files=all"],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0:
-        return None
-    return {e[3:] for e in p.stdout.decode("utf-8", "surrogateescape").split("\0") if e.startswith("?? ")}
+        return None, None
+    ents, unt, gone, i = p.stdout.decode("utf-8", "surrogateescape").split("\0"), set(), set(), 0
+    while i < len(ents):
+        e = ents[i]
+        i += 1
+        if len(e) < 4:
+            continue
+        xy, path = e[:2], e[3:]
+        if xy == "??":
+            unt.add(path)
+        elif "D" in xy:
+            gone.add(path)
+        if xy[0] in "RC":
+            i += 1
+    return unt, gone
+
+
+def untracked(repo):
+    return status_sets(repo)[0]
+
+
+def deleted_in_diff(text, repo):
+    """지운 파일 경로 집합 — 헤더 `deleted file mode` · `--- a/<경로>` 뒤 `+++ /dev/null`."""
+    out, header, cur, old = set(), False, None, None
+    top = os.path.realpath(repo)
+    for line in text.split("\n"):
+        if line.startswith("diff --git "):
+            header, old = True, None
+            cur = _git_b(line[len("diff --git "):].rstrip("\t"))
+            continue
+        if line.startswith("@@"):
+            header = False
+        if not header:
+            continue
+        if line.startswith("deleted file mode ") and cur:
+            out.add(_norm(cur, top))
+        elif line.startswith("--- "):
+            q = _unquote(line[4:].strip())
+            old = q[2:] if q.startswith("a/") else q
+        elif line.startswith("+++ ") and line[4:].strip() == "/dev/null" and old and old != "/dev/null":
+            out.add(_norm(old, top))
+    return out
 
 
 def _unquote(p):
@@ -104,7 +147,7 @@ def run(diff, repo, out=sys.stdout, work_dir=None):
     except OSError as e:
         print(f"UNRUN: diff 를 읽지 못했다 — {e} (⛔ 통과 아님)", file=out)
         return 2
-    want = untracked(repo)
+    want, gone = status_sets(repo)
     if want is None:
         print(f"UNRUN: git 저장소가 아니다 — {repo} (⛔ 통과 아님)", file=out)
         return 2
@@ -117,8 +160,12 @@ def run(diff, repo, out=sys.stdout, work_dir=None):
     missing = sorted(want - have)
     for m in missing:
         print(f"MISSING {m} — untracked 신규 파일이 diff 에 없다(`git diff --no-index /dev/null {m}` 를 덧붙인다)", file=out)
-    print(f"review-diff: untracked={len(want)} diff-new={len(have)} missing={len(missing)} generated-excluded={len(generated)}", file=out)
-    return 1 if missing else 0
+    lost = sorted(gone - deleted_in_diff(text, repo))
+    for m in lost:
+        print(f"MISSING-DELETED {m} — 지운 파일이 diff 에 없다(`git add -N . ; git diff` 꼴은 삭제를 빠뜨린다 — `git diff HEAD` 로 다시 뜬다 · F-724)", file=out)
+    print(f"review-diff: untracked={len(want)} diff-new={len(have)} missing={len(missing)} deleted={len(gone)} missing-deleted={len(lost)} "
+          f"generated-excluded={len(generated)}", file=out)
+    return 1 if missing or lost else 0
 
 
 def self_test():
@@ -148,8 +195,11 @@ def self_test():
         os.makedirs(os.path.join(repo, "c"))
         with open(os.path.join(repo, "a.txt"), "w") as fh:
             fh.write("a\n")
-        for args in (["init", "-q"], ["add", "a.txt"], ["commit", "-q", "-m", "base"]):
+        with open(os.path.join(repo, "gone.txt"), "w") as fh:
+            fh.write("g\n")
+        for args in (["init", "-q"], ["add", "a.txt", "gone.txt"], ["commit", "-q", "-m", "base"]):
             subprocess.run(["git"] + args, cwd=repo, env=env, check=True, stdout=subprocess.DEVNULL)
+        os.remove(os.path.join(repo, "gone.txt"))
         for rel in ("b.txt", "c/d.txt"):
             with open(os.path.join(repo, rel), "w") as fh:
                 fh.write("new\n")
@@ -203,6 +253,21 @@ def self_test():
         check("f270-workdir-artifacts-excluded", rc6 == 0 and "generated-excluded=2" in s6.text
               and rc7 == 1 and "MISSING TICKET-1/plan/plan-final.md" in s7.text and "review/diff.patch" not in s7.text,
               f"{rc6} {s6.text.strip()} / {rc7} {s7.text.strip()}")
+        # F-724 — wave 리뷰 입력 빌더 꼴: add -N . 뒤 diff 는 삭제를 잃는다 · git diff HEAD 는 담는다
+        sub = lambda *a: subprocess.run(["git", "-C", repo] + list(a), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.decode()
+        sub("add", "-N", ".")
+        lossy = sub("diff")
+        sub("reset", "-q")
+        full = sub("diff", "HEAD") + "".join(subprocess.run(["git", "-C", repo, "diff", "--no-index", "/dev/null", n],
+                                                              stdout=subprocess.PIPE).stdout.decode() for n in news)
+        p1, p2 = os.path.join(d, "lossy.patch"), os.path.join(d, "full.patch")
+        open(p1, "w").write(lossy)
+        open(p2, "w").write(full)
+        s8, s9 = Sink(), Sink()
+        rc8, rc9 = run(p1, repo, s8, work_dir=wd), run(p2, repo, s9, work_dir=wd)
+        check("f724-deleted-file-missing — add -N . ; git diff 는 지운 gone.txt 를 잃어 1 · git diff HEAD 는 0",
+              "gone.txt" not in deleted_in_diff(lossy, repo) and "gone.txt" in deleted_in_diff(full, repo) and rc8 == 1 and "MISSING-DELETED gone.txt" in s8.text and rc9 == 0 and "missing-deleted=0" in s9.text,
+              f"{rc8} {s8.text.strip()[-200:]} / {rc9} {s9.text.strip()[-200:]}")
         s4 = Sink()
         check("unreadable-or-not-repo-unrun", rc3 == 2 and run(os.path.join(d, "none.patch"), repo, s4) == 2, f"{rc3} {s3.text}")
     print(f"self-test {passed}/{passed + len(fails)} passed")
