@@ -122,7 +122,7 @@ light 는 새 모드가 아니라 각 스킬이 이미 가진 **Workflow 없는 
 | fz-plan | Phase 1 을 Lead 가 수행 → Phase 2 · 3 · 원장 그대로 | `workflows/plan-lean2.js` |
 | fz-review | Phase 5 Lead 3중 검증(GPT review · 5.5 validate 포함) | `workflows/review-live.js` |
 | fz-peer-review | Tier 1 (`--tier 0` 은 명시할 때만 — GPT 없음) | Tier 2 · `--deep` 은 Tier 3 |
-| fz-code | Lead 가 Step 마다 직접 구현 · Step 마다 빌드 · 원장 게이트 | `workflows/code-pair.js` `mode:'full'` Step 마다 |
+| fz-code | Lead 가 Step 마다 직접 구현(세션 위임 규율이 있으면 Step 수행은 워커 — fz-code light 절 · F-623) · Step 마다 빌드 · 원장 게이트 | `workflows/code-pair.js` `mode:'full'` Step 마다 |
 | fz-fix | Lead 직접 수정 | `workflows/code-pair.js` `mode:'light'` (code-pair 의 내부 인자 이름이다 — 모드 이름과 별개) |
 | fz-discover | Lead 탐색 | `workflows/discover-adversarial.js` |
 

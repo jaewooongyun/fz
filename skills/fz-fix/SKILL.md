@@ -157,12 +157,17 @@ metadata:
    - `mcp__sequential-thinking__sequentialthinking` → 5 Whys 기법 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
    - `/sc:sc-explain` → 프레임워크/라이브러리 깊은 에러의 교육적 설명 (도구 목록에 있으면 쓴다)
 2. **⛔ Step 1c 완료 전 코드 수정 금지**. root-cause가 불명확하면 AskUserQuestion.
+3. **가설은 관측 전부를 설명할 때 확정한다** — 사용자가 말한 발생 조건과 해소 조건 둘 다(F-749), 증상이 사는 구성 요소의 변형 전체(종류 · 배치 · 기기 · 그리는 주체를 표로 세고 뺀 칸은 '증상 남음/없음' — F-754), 고칠 자리가 앞선 덧대기(보조 뷰 · 분기 · 덮어쓰기)를 넓히는 꼴이면 그 덧대기를 낳은 커밋 본문(덧대기를 없애는 안을 대안 1번으로 — F-753). 이유: 보고된 장면 하나만 설명하는 가설은 그 장면에서 맞고 해소 조건 · 형제 변형 · 뿌리 결정에서 틀린다 — 셋 다 수정 뒤에야 드러났다. 작업 폴더가 있으면 `fix-analysis.md` 에 그 셋(해소 조건 대조 · 변형 표 · 앞선 결정)을 남긴다
 
 ### Step 2: 수정
 
 ⛔ **패턴 변환 감지** (수정이 비동기/네트워크/UI 패턴 변환을 포함할 때):
 - `modules/code-transform-validation.md` 참조. 원본 런타임 특성(스레드, 에러) 확인 후 수정
 - Context7로 원본 API 동작 확인. 수정 후 Behavioral Equivalence Check 수행
+
+⛔ **선례 복사** (테스트 대역 · helper 를 같은 축 선례 테스트에서 가져올 때): 선례와의 차이를 열거하고 각 차이가 실제로 읽히는지 확인한다 — 안 읽히면 복사하지 않고 공용 파일로 옮겨 함께 쓴다. `check_moved_code.py {BASE} WORKTREE` 의 `COPY-BLOCK`(새 파일의 추가 줄이 BASE 와 80% 겹침)이 이 자리를 가리킨다 (F-706)
+
+> candidate 신호(활성 아님 · 권장 self-check): 인용한 선례 대조(F-703) · 캐시되는 override getter 의 갱신 경로(F-704) — `references/fix-candidates.md`
 
 | 상황 | 도구 |
 |------|------|
@@ -180,7 +185,7 @@ metadata:
 
 수정이 재현 경로(Step 1a)에서 문제를 해결했는지 확인:
 - `mcp__plugin_fz_serena__find_referencing_symbols` → 참조 무결성 확인
-- **변이 셀** (수정 hunk 가 있는 Step 만 — 비용 상한): 수정의 핵심 호출을 지운(되돌린) 사본에서 이 수정을 검증한 같은 테스트 · 검사를 다시 돌려 FAIL 하는지 한 번 잰다 — 통과하면 그 검사는 수정을 보지 않는다(떼어 낸 판정 함수만 부르는 테스트는 본체를 지워도 통과한다). 처방은 fz-code 6.4 와 같다 — 정본 근거 `modules/gates.md` § 원장 운용 규율 3(F-447 · F-705)
+- **변이 셀** (수정 hunk 가 있는 Step 만 — 비용 상한): 수정의 핵심 호출을 지운(되돌린) 사본에서 이 수정을 검증한 같은 테스트 · 검사를 다시 돌려 FAIL 하는지 한 번 잰다 — 통과하면 그 검사는 수정을 보지 않는다(떼어 낸 판정 함수만 부르는 테스트는 본체를 지워도 통과한다). hunk 가 여럿이면 hunk 마다 따로 되돌려 실패하는 검사나 재현 관측 차이가 있는지 보고, 둘 다 없는 hunk 는 커밋에서 빼거나 근거 경로 · 관측 여부를 붙여 사용자 선택지로 올린다(F-702). 수정의 핵심이 식(집합 연산 · 비교 · 경계 · 삼항)이면 그럴듯한 오구현 변이(다른 피연산자 반환 · 연산자 교체)도 1개 이상 돌려 살아남으면 그 변이를 죽이는 케이스를 더한다(F-707). 처방은 fz-code 6.4 와 같다 — 정본 근거 `modules/gates.md` § 원장 운용 규율 3(F-447 · F-705)
 - GPT check (GPT 를 켠 세션이면 필수 — `modules/gpt-strategy.md` § 단계 실행 판정): 직전에 `bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide` 한 줄로 분기한다
   - `run` · `config` → `/fz-gpt check` 호출 → cross-model 검증. verdict 분기: pass → 다음 단계 / warn → 사용자 보고 / fail → Step 1c 재진입
   - `skip` → 부르지 않는다(호출이 exit 18 `GPT-OFF` 여도 같다) — `[GPT 미사용 — 사유]` 를 남기고 진행(대체 검증 없음 · `modules/gpt-strategy.md` § GPT 미사용) / `ask` → 모델 질문 → `set` → 다시 decide

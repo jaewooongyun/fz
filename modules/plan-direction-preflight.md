@@ -52,7 +52,7 @@
    - Structural Fit: 현재 구조에 자연스러운가?
    - Alternative Paths: 근본적으로 다른 접근은? (**대안 최소 2개**)
    - Extensibility: N배 확장 시 유지 가능한가?
-   - Existing Pattern Reuse (41차 Reuse-First): 기존 패턴을 재활용할 수 있는가? **신호 기준**: `universal*/extensible*/generic*/common*` 명명 + 5+ 사용처 + URL-agnostic API 시그니처 → 신규 작성 default 차단. **예외**: 레거시 (마지막 수정 6개월+ 또는 deprecated 태그) 시 신규 작성 정당
+   - Existing Pattern Reuse (41차 Reuse-First): 기존 패턴을 재활용할 수 있는가? **신호 기준**: `universal*/extensible*/generic*/common*` 명명 + 5+ 사용처 + URL-agnostic API 시그니처 → 신규 작성 default 차단. **예외**: 레거시 (마지막 수정 6개월+ 또는 deprecated 태그) 시 신규 작성 정당. 기존 자산을 다른 자리에 쓰자고 권고하기 전에 그 자산의 입력 계약과 대상의 실제 입력을 나란히 놓은 표(계약 항목 · 대상 값 · 맞음/안 맞음)를 먼저 쓴다 (F-650)
    - Maintenance Cost: 장기 유지보수 비용은 합리적인가?
    - Over-Engineering Risk: 현재 요구 대비 과하지 않은가?
 

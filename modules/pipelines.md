@@ -63,6 +63,7 @@
 | 체인 | fz-search → fz-fix |
 | 기본 모드 | SOLO |
 | 게이트 | ✓ build (fz-fix 후) + ✓ gpt check (fz-fix Step 4) |
+| 절단점 '원인 확인까지' | fz-search → fz-fix Step 1a ~ 1c(재현 · 격리 · 원인)에서 멈춘다 — 수정은 하지 않는다. 정적 추적만으로 원인을 보고하지 않는다: 증상 관측(재현)이 원인 판정의 입력이다(F-749) |
 
 ### 5. quick-fix
 
@@ -216,6 +217,7 @@
 2. **verify-each**: 각 코멘트에 External Feedback Gate 적용 — Read(함수 시그니처) + 기존 패턴 대조 → valid/invalid/needs-investigation 판정
 3. **user-confirm**: 코멘트별 판정 + 대응 초안 테이블(어조 `modules/team-facing-writing.md`) → 사용자 승인 → (선택) GitHub 답변 포스트
 4. **import-to-ledger** (트랙 C 펜): user-confirm에서 valid/needs-investigation으로 승인된 항목 중, 이번 세션이 `/fz-review --deep` 이후 외부 리뷰어가 발견한 fz-miss면 → (a) fz-review Issue Tracker에 append (severity/category/file/line/description), (b) `promotion-ledger.md` 트랙 C 관측 기록 (finding-source: external + 4-classify 분류). user-confirm 승인 게이트가 기록 전 사람 확인 보장 (precision ~55% FP 차단). fz-miss 아니면(외부가 새 이슈만 제기) skip. 단 트랙 C *활성화 카운트*엔 4-classify가 project-rule/valid-suggestion인 항목만 반영 — verify-each 판정축(valid/needs-investigation)과 신뢰도축(4-classify)은 독립이라 import돼도 count 제외 가능.
+5. **레지스트리 기록** (F-708): user-confirm 판정 표에 `finding` 열을 두고, 내 검증(`/fz-review` · `/fz-fix` · `/fz-code` 어느 쪽이든)이 놓친 지적을 '맞다' 로 판정한 행마다 그 자리에서 레지스트리 번호를 적거나 `해당 없음 — <사유>` 를 적는다 — 4 의 트랙 C 원장은 `--deep` 리뷰 뒤의 fz-miss 만 센다. 답 끝에 `finding 해당 없음 — <사유>` 줄이 없고 레지스트리 쓰기도 없으면 fz-guard FR 이 그 턴의 Stop 을 1회 막는다
 
 ---
 

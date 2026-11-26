@@ -363,10 +363,10 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 1b. **⛔ Scope Challenge (이슈당 필수)**: 각 GPT 이슈를 플랜에 반영 전 `modules/scope-challenge.md` Q-S1~S4 실행 → `scope_disposition` 분류. Lead는 GPT 결과를 **읽기 전** 독립 판정 후 비교 (Generator≠Evaluator).
 
-2. **요구사항 일치 검증**:
+2. **요구사항 일치 검증** — 항목마다 요구 원문(사용자가 고른 구성 포함)과 계획이 정한 하위 선택을 나란히 놓는다. 다르면 요구대로 바꾸거나 3 의 질문에 올리고, '고침' 표기는 요구 문장대로일 때만 쓴다 · 요구가 이름으로 든 파일이 어느 Step 파일 목록에도 없으면 같은 처분이다(F-651):
    - `mcp__sequential-thinking__sequentialthinking` → 수정 전후 요구사항 부합도 단계별 비교 (seq 목록✗ 이면 같은 분해를 표로 직접 쓴다)
 
-3. **사용자 의사결정** (AskUserQuestion):
+3. **사용자 의사결정** (AskUserQuestion) — ⛔ 질문문에는 결정마다 무엇이 사라지는가(기능 · 검증 단계 · 폴백) · 그 손실을 쟀는가(재지 않았으면 그렇다고 · 근거가 쓰임 수치뿐이면 '못 씀' 과 '안 시킴' 을 가르는 값싼 측정을 먼저) · 대안을 싣는다 — 결정의 이름 · 번호만 싣지 않는다. 답을 받은 뒤 찾은 손실과 계획의 '남는 틈 · 닫지 않았다' 가운데 사용자가 고를 것(완전성을 요구받은 과제면 남긴 틈 전부)도 이 질문에 다시 올린다(F-648). 선택지:
    - 수정 후 Phase 2 재검증
    - 현재 계획으로 구현 진행
    - 추가 논의
@@ -376,7 +376,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
    - **WORK_DIR 존재(티켓 폴더 또는 NOTASK)**: `plan-v{N+1}.md` 생성 + 최종 승인 시 `plan-final.md` + `index.md` 업데이트
      ⛔ **`plan-v{N}` 은 변경 이력이고 `plan-final.md` 는 승인본이다 — 승인 시 `plan-final.md`·`plan/steps.json`·`gates/plan.md` 를 같은 버전으로 완전 재생성한다**(해당 구역만 고쳐 쓰는 것도 허용 — 요구는 *결과가 단일 최신 상태*라는 것).
 
-4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사하고, 실행 게이트마다 `SIDE_EFFECTS: none|tmp|writes — <사유>` 를 원장에 선언한 뒤 무변경 트리 기준선을 먼저 잰다 — `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --baseline-probe {WORK_DIR}/gates/plan.md`(none · tmp 만 돈다 · 허용 밖 PASS = exit 1 → 그 게이트를 고치거나 의도면 `--allow-pass <id>` · WARN 의 TIMEOUT 은 실측 소요로 다시 정한다 · 잴 수 없으면 확정에 `--no-baseline <사유>`). 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize {WORK_DIR}/gates/plan.md` 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state planned {WORK_DIR}/gates/plan.md` — 승인·미착수라 Stop hook 이 ABANDON 없이 통과시킨다(진행 기록이 있으면 거부 · `/fz-code` Phase 0.4 가 `active` 로 연다). 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
+4.5. **⛔ 원장 확정** (draft 원장이 있을 때): Phase 2 판정(3.2)을 반영해 `gates/plan.draft.md` → `gates/plan.md` 로 복사하고, 실행 게이트마다 `SIDE_EFFECTS: none|tmp|writes — <사유>` 를 원장에 선언한 뒤 무변경 트리 기준선을 먼저 잰다 — `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --baseline-probe {WORK_DIR}/gates/plan.md`(none · tmp 만 돈다 · 허용 밖 PASS = exit 1 → 그 게이트를 고치거나 의도면 `--allow-pass <id>` · WARN 의 TIMEOUT 은 실측 소요로 다시 정한다 · 잴 수 없으면 확정에 `--no-baseline <사유>`). 기준선 소요(실측)는 일정과 구현 진입 목록에 싣는다 — 늦게 재면 착수가 그만큼 밀린다(F-666). 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --finalize {WORK_DIR}/gates/plan.md` 를 돌린다 — 실행 게이트마다 `APPROVED_ORACLE_HASH` 도장을 찍고 `APPROVED: yes` 를 남긴다. ⛔ 도장이 없으면 승인 계약이 존재하지 않는다(검사는 있으나 발급이 없어 한 번도 발화하지 않았다). `revise`는 CHECK/EXPECT 수정, `demote_to_manual`은 `MANUAL:`로 전환. 이어 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --set-state planned {WORK_DIR}/gates/plan.md` — 승인·미착수라 Stop hook 이 ABANDON 없이 통과시킨다(진행 기록이 있으면 거부 · `/fz-code` Phase 0.4 가 `active` 로 연다). 확정 후 `python3 "${FZ_PLUGIN_ROOT}/scripts/gate_check.py" --status {WORK_DIR}/gates/plan.md`.
    exit별 행동 — `0` 진행 · `1` 미충족 보고 후 진행(작업 중 정상 상태) · `2` **인프라 경고 후 진행**(경로·인터프리터 문제이지 원장 결함이 아니다) · `3` **미통과 차단**(확정 원장이 계약을 위반하면 안 된다).
    ⛔ 상대 경로 금지 — 설치된 플러그인에서 대상 레포에 파일이 없어 exit 2로 떨어지고, exit 3만 차단하는 규칙 하에서 **invalid ledger 검증이 fail-open** 된다. 절차 정본: `modules/gates.md`
 
@@ -384,7 +384,7 @@ bash "${FZ_PLUGIN_ROOT}/scripts/gpt-choice.sh" decide   # 직전 판정(modules/
 
 ### Gate 2: Validation Passed
 - [ ] Critical 이슈 모두 해결?
-- [ ] 사용자 승인 완료?
+- [ ] 사용자 승인 완료? — 질문문은 Phase 3 의 3 꼴(F-648)
 - [ ] 수정된 계획이 요구사항과 일치?
 
 ---

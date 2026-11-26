@@ -93,8 +93,8 @@ metadata:
 ### 실행 절차 (Lead)
 
 > ⛔ **Workflow 먼저 기동** — Workflow 는 백그라운드로 돈다. args(1 · 2)가 확정되면 곧바로 띄우고, 입력이 아닌 일(외부 자문 · 참조 무결성 확인 · L3 에이전트)은 Workflow 가 도는 동안 한다 — 방향이 아직 정해지지 않았을 때만 자문을 먼저 한다. GPT 독립 첫 패스(2.5)는 백그라운드 한 줄이라 그대로 직전에 둔다(S22). 실측(R-C 18 run): 기동 앞 자문이 16 run 에서 102~283s 를 Workflow 앞에 붙였다
-1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). 작업 폴더가 없으면 diff 는 임시 폴더(`mktemp -d`)의 `diff.patch` 에 쓰고, 그 절대 경로를 이 단계 · 1.5 · 검증 3 브리프의 diff 경로로 그대로 쓴다. **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · exit 2 는 대조 불가(통과 아님)
-1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람)
+1. **리뷰 대상 기록**: diff를 `{WORK_DIR}/review/diff.patch`로 기록 (untracked 신규 파일은 `git diff --no-index /dev/null {file}` append). 작업 폴더가 없으면 diff 는 임시 폴더(`mktemp -d`)의 `diff.patch` 에 쓰고, 그 절대 경로를 이 단계 · 1.5 · 검증 3 브리프의 diff 경로로 그대로 쓴다. **대형 diff는 args가 아닌 파일 경로 전달** (§12) · ⛔ 기록 뒤 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_review_diff.py" --diff {WORK_DIR}/review/diff.patch --repo {GIT_ROOT} --work-dir {WORK_DIR}` — exit 1 이면 `MISSING` 신규 파일을 덧붙이고 다시 돈다(F-270: 신규 파일을 빠뜨려 변경의 60% 가 리뷰 밖에 있었다) · `MISSING-DELETED` 면 diff 를 `git diff HEAD` 로 다시 뜬다(`git add -N . ; git diff` 꼴은 지운 파일을 잃는다 · F-724) · exit 2 는 대조 불가(통과 아님)
+1.2. **이동 후보 표시**: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_moved_code.py" {BASE} WORKTREE --repo {GIT_ROOT}`(리뷰 대상이 커밋 범위면 `WORKTREE` 대신 그 끝 커밋) — `MOVE-CANDIDATE` 파일은 신규 코드로 읽기 전에 BASE 의 출처를 본다(F-078 · 신규성 판정은 사람) · `DUP-ADDED`(같은 변경이 만든 헬퍼를 쓰지 않고 본문을 다시 적은 꼴 · F-172) · `COPY-BLOCK`(새 파일이 선례를 값만 바꿔 복사한 꼴 · F-706)은 리뷰 지적 후보다
 1.5. **모드 게이트** (`modules/mode-gate.md` — 명시 인자 · 신호어 · `/fz` 에서 명시로 고른 모드면 재지 않는다): `python3 "${FZ_PLUGIN_ROOT}/scripts/mode_gate.py" review --diff {WORK_DIR}/review/diff.patch --estimate review-live` 로 잰다 — 추천 full 일 때만 묻는다(그 밖은 묻지 않고 light + 통보 — `modules/mode-gate.md` § 언제 묻나 5 · 6). **light** 면 2~4.5 를 건너뛰고(⊕ `--gpt-independent` 면 2.5 는 그대로 띄우고 4.5 는 Lead 발견 JSON 으로 병합한다) Phase 5 Lead 3중 검증으로 간다(위 light 모드) · **full** 이면 이어간다 · 모드가 정해지면(묻지 않은 경로 포함) 기록 `run_metrics.py start`(`modules/mode-gate.md` § 기록)
    - ⊕ (`snapshotDir` · 기본 off) `bash "${FZ_PLUGIN_ROOT}"/scripts/review_snapshot.sh --repo {GIT_ROOT} --out {WORK_DIR}/review/snapshot-{run} [--base {ref}] [--rules {projectRulesPath}]` 폴더를 args `snapshotDir` 로 넘긴다 — 같은 base/ · head/ 를 독립 첫 패스 `--base` · `--head` 에 주면 두 패스가 같은 입력을 본다
 2. **args 조립**: `diffPath`=diff 파일 절대 경로 / `intentContext`=변경 의도 + 대체 대상 + 참조 가이드(스택 스킬을 불렀으면 그 요구 사항 — 위 `## 스택 스킬`) (기존 Intent Context 계약 승계 — ⛔ `plan-final.md` 등에서 온 자기 설계 판단 · 위험 추정은 넣지 않는다: 렌즈가 내 판단을 확인만 하게 된다 · F-042) / `structuralContext`=`modules/review-structural-axes.md` Read 후 §3 축 + §4 경계 문구 (미전달 시 구조 축 미적용) / `effort`=1.5 `mode_gate.py` 결과 `effort.value`(lead-effort — null 이면 넣지 않는다 · `modules/mode-gate.md` § effort)
@@ -151,7 +151,7 @@ TEAM 모드 Intent Context 추가: `[소비자 코드]: {파일 목록}` + `[진
    - plan-final.md 에서 RTM 로드
    - 모든 Req-ID가 implemented 상태인지 확인
    - pending 잔존 → requirements_gap 이슈
-2. 요구사항 목록화 → 체크리스트
+2. 요구사항 목록화 → 체크리스트 — 요구가 대상을 갈래(표 · 목록)로 나눴으면 갈래 수 N 과 구현 메커니즘 수 M 을 대조한다(N≠M 이면 requirements_gap) · 사용자 발언을 원칙으로 인용하면 그 발언이 속한 갈래를 함께 적는다(F-113)
    - 세션 내 task/plan에서 구현 대상 추출
    - 커밋 메시지에서 의도 추출
 3. diff에서 각 요구사항 구현 여부 확인
@@ -401,7 +401,7 @@ Gate 5 통과 후:
    - ⊕ `--render`(기본 off)면 이슈 목록을 손으로 다시 쓰지 않는다 — 판정·문장만 `{WORK_DIR}/review/review.json` 에 쓰고 `python3 "${FZ_PLUGIN_ROOT}/scripts/render_review.py" --review {WORK_DIR}/review/review.json --diff {WORK_DIR}/review/diff.patch --out-dir {WORK_DIR}/review` 가 `review-report.md` 를 만든다(PR 이 없으면 payload 는 만들지 않는다). review.json 형식은 `render_review.py --example` 이 내는 최소 예시를 따른다 — 렌더러 코드를 다시 읽지 않는다. 미지정이면 위 절차 그대로다
 4. **Git 연계** (사용자 확인 후): `/fz-commit` → `/fz-pr`
 
-완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 세션ID, 총이슈→해결/보류, Reflection Rate, 반복횟수, 변경파일, 다음단계
+완료 보고(직전에 기록 `run_metrics.py end` — `modules/mode-gate.md` § 기록): 총이슈→해결/보류, 반복횟수, 변경파일, 다음단계 — 세션 식별자 · 반영률 수치는 `{WORK_DIR}/review/self-review.md` 에 남기고 사용자 보고에는 적지 않는다(F-744)
 
 ### Harness Metrics (v3.8+)
 
@@ -428,7 +428,7 @@ Gate 5 통과 후:
 ```
 예시 1 — 리뷰 완료 보고:
   BAD:  "리뷰 완료. 문제 없음." → 근거 없음, Rate 없음
-  GOOD: 이슈 N개 + Reflection Rate: X/Y (ZZ%) + GPT 교차 검증 결과
+  GOOD: 이슈 N개(해결 · 보류) + GPT 교차 검증 결과 — 반영률 수치는 self-review.md 에
 
 예시 2 — Anti-Pattern 잔존 검증 (검증 4-F → 절차: modules/review-checks.md):
   BAD:  diff 삭제 라인만 확인 → "패턴 제거" 판정 (다른 파일에 잔존)

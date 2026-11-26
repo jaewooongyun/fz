@@ -45,7 +45,7 @@ metadata:
 ## light 모드 (기본 경로 — 모드 게이트 `modules/mode-gate.md`)
 
 진입: 팀 모드 실행 절차 0 에서 light 를 고르거나 명시 인자 `light` · 신호어(정본 `modules/mode-gate.md` § 신호어).
-- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로
+- code-pair 를 띄우지 않고 Plan 의 **모든** Step 을 Lead 가 구현 절차(1~8.5)대로 직접 구현한다 — Step 마다 빌드 · 원장 게이트(6.4) · 마찰 감지 그대로. 단 세션에 생산을 워커에 맡기라는 위임 규율(사용자 지시 · 메모리)이 있으면 그 규율이 이 기본보다 먼저다 — Step 수행은 워커에 넘기고(검토 렌즈 없이) Lead 는 적용 · 게이트 · 판정만 한다. light 는 절차의 양을 고르는 손잡이지 생산 주체를 고정하지 않는다 (F-623)
 - GPT 교차 검증(8.5)은 full 과 같다(끈 세션이면 `[GPT 미사용]`)
 - 점검 카탈로그: `templates/check-catalog-code.md` 를 Read 해 Step 산출물에 대 본다(Workflow 워커와 같은 정본 — 공용 블록). `catalogHits` 인자를 주면 Step 산출물에 `## 점검 카탈로그 판정` 표(id · target · verdict)를 남기고 `python3 "${FZ_PLUGIN_ROOT}/scripts/check_catalog_hits.py" <code/step-N.md> --catalog "${FZ_PLUGIN_ROOT}/templates/check-catalog-code.md"` 로 잰다
 - 단 산출물이 전수/카운트/부정 주장 포함 시 Coverage Gate(cross-validation.md §Coverage Gate) 적용 — light에서도 생략 불가 (검증 경계) ⛔ **그중 부정 주장(0건·부재·"~뿐")은 §Negative-Result Gate 도 함께 적용**(positive control + exit code) — Coverage Gate 는 *범위*(N 중 M)를 보고 Negative-Result Gate 가 *도구 유효성*을 본다. **N 자체가 오측정이면 0/0 으로 통과한다**(`skills/fz-peer-review/SKILL.md` Synthesize 인용)
@@ -246,7 +246,7 @@ metadata:
    | 마찰 신호 | 감지 기준 | 의미 |
    |----------|----------|------|
    | 분기 폭증 | 같은 대상에 대한 switch/if/enum case 3개+ | 추상화가 변형을 통합하지 못함 |
-   | 코드 반복 | 유사 구조의 코드를 복사-수정 3회+ | 공통 추상화 필요. 내 편집이 만든 중복 정리는 drive-by 아님(편집의 완결) |
+   | 코드 반복 | 유사 구조의 코드를 복사-수정 3회+ · ⊕ 이번 변경이 만든 헬퍼의 본문이 같은 변경의 다른 추가 줄에 다시 나오면 **1회라도**(`check_moved_code.py {BASE} WORKTREE` 의 `DUP-ADDED` · F-172) | 공통 추상화 필요. 내 편집이 만든 중복 정리는 drive-by 아님(편집의 완결) — 3회 임계는 남의 코드 반복용이다 |
    | 소비자 판별 로직 | ViewModel/Listener에 "어떤 X인지" 판별 코드 발생 | 하위 복잡도가 상위로 전이됨 |
    | workaround | 계획에 없던 우회 코드 작성 | 설계와 현실의 불일치 |
    | 잔존 패턴 | Plan의 Anti-Pattern Constraints에 명시된 금지 패턴이 기존 코드에 여전히 존재 | 리팩토링 미완성 — 해당 패턴 제거/대체 필요 |
@@ -310,7 +310,7 @@ metadata:
 
 6. **매 Step 완료 후 빌드 검증**: 참조 `modules/build.md`
    - 마커 누출: `python3 "${FZ_PLUGIN_ROOT}/scripts/check_marker_leak.py" --repo {GIT_ROOT} --base {base}` — exit 1 이면 대상 저장소 주석에 들어간 fz 마커(⛔ · ✅ · **강조**)를 그 저장소 주석 관례로 바꾼다 · 2 는 UNRUN(통과 아님) (F-175)
-   - 대체 Step 이면: `python3 "${FZ_PLUGIN_ROOT}/scripts/call_set_diff.py" {레거시 파일} {신규 파일}` — `LEGACY-ONLY` 호출마다 옮겼는지 · 일부러 뺐는지 Step 기록에 적는다 (F-126)
+   - 대체 Step 이면: `python3 "${FZ_PLUGIN_ROOT}/scripts/call_set_diff.py" {레거시 파일} {신규 파일}` — `LEGACY-ONLY` 호출마다 옮겼는지 · 일부러 뺐는지 Step 기록에 적는다. 이 도구는 두 파일의 호출 집합만 보므로, 대체 대상이 닿던 기능의 종착 함수를 부르는 기존 호출부(형제 진입점)도 모두 찾아 기기 · 상태 분기를 새 경로와 대조한다 (F-126)
 
 6.3. **⛔ Behavioral Equivalence Check** (Transformation Spec이 있는 Step 완료 후):
    - Plan의 Transformation Spec 로드 → 원본 코드 Read
@@ -331,7 +331,7 @@ metadata:
    python3 "$G" --set-state ready_for_review {WORK_DIR}/gates/plan.md   # 전 Step 완료 시
    ```
    `--affected-by` 는 바뀐 파일의 경로 · basename 을 CHECK · CRITERION · PIN 에 담은 **충족** 게이트 id 를 낸다(읽기 전용) — 뒤 Step 이 앞 Step 게이트의 근거 코드나 공유 스크립트를 바꿔도 그 게이트가 다시 돈다(F-349 · F-552)
-   - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어 낸 판정 함수만 부르는 테스트가 본체를 지워도 통과했다 · 정본 `modules/gates.md` § 원장 운용 규율)
+   - 버그 수정 Step 이면 **변이 셀**: 수정의 핵심 호출을 지운(되돌린) 사본에서 그 Step 테스트가 FAIL 하는지 한 번 잰다 — 통과하면 테스트가 수정을 보지 않는다(F-447: 떼어 낸 판정 함수만 부르는 테스트가 본체를 지워도 통과했다 · 정본 `modules/gates.md` § 원장 운용 규율) — hunk 가 여럿이면 hunk 마다 따로 되돌려 기대는 테스트 · 재현 관측이 없는 hunk 는 빼거나 사용자 선택지로 올리고(F-702), 수정의 핵심이 식이면 그럴듯한 오구현 변이도 1개 이상 돌려 살아남으면 그것을 죽이는 케이스를 더한다(F-707)
    - 게이트를 오탐으로 판정하면 그 게이트가 잡은 대상 집합을 새 기준으로 **전수 재분류**해 건수(분모)를 보고하고, 계획이 `파일:줄` 로 지목한 항목은 `git diff` 로 하나씩 확인해 Step 기록에 적는다(F-236: '과잉 55건' 안에 진짜 갭 1건이 섞여 있었다)
    - 플러그인 저장소 작업이면 Step 경계의 health 검사를 표적 테스트 통과로 갈음하지 않는다 — `git diff --name-status {base} > {WORK_DIR}/code/changed.txt` 뒤 `bash "${FZ_PLUGIN_ROOT}/scripts/health-check.sh" --changed-from {WORK_DIR}/code/changed.txt`. 파일을 옮기거나 지운 Step 이면 `scripts/health_select.py` 가 전체 실행을 고른다(F-512 — 이동 단계의 기준선 lint 실패를 다음 작업자가 전체 실행에서야 잡았다)
    ⛔ **상대 경로 금지** — 설치된 플러그인에서는 대상 레포에 `scripts/gate_check.py`가 없다. exit 2(인프라 통과)로 떨어져 강제력이 조용히 사라진다.
@@ -381,7 +381,7 @@ metadata:
 - [ ] ⛔ Step 산출물마다 `## 기각한 위험` 절(위험 행 또는 `없음`)을 남겼는가? (F-523 — 비면 PR 이송 검사가 대조 불가로 멈춘다)
 - [ ] ⛔ 새 SPM 패키지 생성이면 Chore 완료? (.gitignore .build 등록, Package.resolved 커밋, pbxproj 등록)
 - [ ] 트리거 해당 시 Implication Scan 실행? (modules/lead-reasoning.md + cross-validation.md 참조)
-- [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가?
+- [ ] 관찰 함의(카테고리 B)가 있으면 사용자에게 보고했는가? · 세션 중 알린 결정('…안으로 정리')을 측정이 뒤집었으면 완료 보고 맨 위에서 정정했는가? (F-638) *[candidate: 1 session evidence]*
 - [ ] ⛔ GPT 교차 검증 완료? (GPT 를 켠 세션 — light · full 모두 Lead가 /fz-gpt check 실행 · 끈 세션은 `[GPT 미사용]` 기록)
 
 ---

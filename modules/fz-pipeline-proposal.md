@@ -1,6 +1,6 @@
 # fz Pipeline Proposal — 사용자 확인 시각화
 
-> **Scope of Applicability**: `/fz` 오케스트레이터 Phase 4 (User Confirmation) 전용. 다른 스킬에서 유사한 확인 단계가 필요하면 표 컬럼(스킬/역할/실행자/모델)과 범위 확인 임계치(5 Step)가 해당 스킬에 맞는지 먼저 검토.
+> **Scope of Applicability**: `/fz` 오케스트레이터 Phase 4 (User Confirmation) 전용. 다른 스킬에서 유사한 확인 단계가 필요하면 표 컬럼(# · 스킬 · 역할)과 범위 확인 임계치(5 Step)가 해당 스킬에 맞는지 먼저 검토.
 >
 > **Purpose**: 결정된 파이프라인·팀 구성·모델 배정을 사용자에게 제시하고 승인을 받기 위한 표준 시각화 형식.
 
@@ -26,16 +26,16 @@
 **파이프라인**: `{파이프라인 이름}`
 **모드**: TEAM (점수: {점수}/10)
 
-| # | 스킬 | 역할 | 실행자 | 모델 |
-|---|------|------|--------|------|
-| 1 | /fz-code | 점진적 구현 | impl-correctness ★ | opus |
-| 2 | ✓ build | 빌드 검증 | Lead | — |
-| 3 | ✓ gpt check | 교차 검증 | Lead | gpt |
-| 4 | /fz-review | 아키텍처 리뷰 | review-arch | opus |
-| 5 | /fz-review | 품질 리뷰 | review-quality | opus |
-| 6 | /fz-commit | 커밋 | Lead | fable |
+| # | 스킬 | 역할 |
+|---|------|------|
+| 1 | /fz-code | 점진적 구현 |
+| 2 | ✓ build | 빌드 검증 |
+| 3 | ✓ gpt check | 교차 검증 |
+| 4 | /fz-review | 아키텍처 리뷰 |
+| 5 | /fz-review | 품질 리뷰 |
+| 6 | /fz-commit | 커밋 |
 
-**에이전트**: Lead(fable) + impl-correctness(★opus) + review-arch(opus) + review-quality(opus) — 동시 opus ≤3
+**에이전트**: Lead + impl-correctness ★ + review-arch + review-quality
 ```
 
 > ✓ 접두사: 자동 삽입된 검증 게이트. ★: Primary Worker (opus). 모델 열 `gpt` 는 세션 선택이 있으면(`gpt-choice.sh get` exit 0) `gpt (<slug>/<level>)` 로 선택값을 붙인다.
